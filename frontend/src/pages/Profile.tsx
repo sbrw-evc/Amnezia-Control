@@ -6,6 +6,7 @@ import { Fmt, ROLE_LABEL } from "@/lib/format";
 import { useAction } from "@/lib/hooks";
 import { useAuth } from "@/store/auth";
 import { Badge, Card, Field, Page, PageHeader } from "@/components/ui/Primitives";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 export default function Profile() {
   const { user, bootstrap } = useAuth();
@@ -38,9 +39,9 @@ export default function Profile() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card title={<span className="flex items-center gap-2"><KeyRound size={14} /> Смена пароля</span>}>
           <form onSubmit={submit} className="space-y-3">
-            <Field label="Текущий пароль"><input className="input" type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></Field>
-            <Field label="Новый пароль" hint="не короче 10 символов, буквы разного регистра или цифры"><input className="input" type="password" autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></Field>
-            <Field label="Повторите" hint={mismatch ? <span className="text-red-300">пароли не совпадают</span> : undefined}><input className="input" type="password" autoComplete="new-password" value={pw.repeat} onChange={(e) => setPw({ ...pw, repeat: e.target.value })} /></Field>
+            <Field label="Текущий пароль"><PasswordInput autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></Field>
+            <Field label="Новый пароль" hint="не короче 10 символов, буквы разного регистра или цифры"><PasswordInput autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></Field>
+            <Field label="Повторите" hint={mismatch ? <span className="text-red-300">пароли не совпадают</span> : undefined}><PasswordInput autoComplete="new-password" value={pw.repeat} onChange={(e) => setPw({ ...pw, repeat: e.target.value })} /></Field>
             <button className="btn-primary" disabled={!pw.current || !pw.next || mismatch || change.isPending}>Сменить пароль</button>
           </form>
         </Card>

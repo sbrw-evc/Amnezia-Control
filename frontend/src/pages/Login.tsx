@@ -1,4 +1,6 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
+import { notify } from "@/lib/notify";
+import PasswordInput from "@/components/ui/PasswordInput";
 import { Activity, KeyRound, Loader2, LogIn, ShieldCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -13,14 +15,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"password" | "totp">("password");
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const shake = useAnimationControls();
 
   if (ready && user) return <Navigate to={from} replace />;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
     setBusy(true);
     try {
       if (step === "password") {
@@ -33,7 +34,8 @@ export default function LoginPage() {
       }
       nav(from, { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка входа");
+      notify.error("Не удалось войти", err instanceof Error ? err.message : "Ошибка входа");
+      shake.start({ x: [0, -10, 10, -6, 6, 0], transition: { duration: 0.4 } });
     } finally {
       setBusy(false);
     }
@@ -46,8 +48,9 @@ export default function LoginPage() {
       <motion.div className="absolute -bottom-40 -right-40 h-[480px] w-[480px] rounded-full bg-indigo-600/20 blur-3xl"
         animate={{ x: [0, -50, 0], y: [0, -30, 0] }} transition={{ duration: 16, repeat: Infinity }} />
 
+      <motion.div animate={shake} className="relative w-full max-w-sm">
       <motion.form onSubmit={submit} initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 200, damping: 22 }} className="card relative w-full max-w-sm p-7 shadow-2xl">
+        transition={{ type: "spring", stiffness: 200, damping: 22 }} className="card relative w-full p-7 shadow-2xl">
         <div className="mb-6 flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-glow">
             <Activity className="text-white" size={22} />
@@ -67,7 +70,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <label className="label" htmlFor="p">Пароль</label>
-                <input id="p" className="input" type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+                <PasswordInput id="p" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
             </motion.div>
           ) : (
@@ -75,15 +78,6 @@ export default function LoginPage() {
               <div className="flex items-center gap-2 text-sm text-slate-300"><ShieldCheck size={16} className="text-emerald-400" /> Введите код из приложения-аутентификатора</div>
               <input className="input text-center font-mono text-2xl tracking-[.5em]" inputMode="numeric" autoFocus maxLength={6}
                 value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {error && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto", x: [0, -6, 6, -4, 4, 0] }} exit={{ opacity: 0, height: 0 }}
-              className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200" role="alert">
-              {error}
             </motion.div>
           )}
         </AnimatePresence>
@@ -98,6 +92,7 @@ export default function LoginPage() {
           </button>
         )}
       </motion.form>
+      </motion.div>
     </div>
   );
 }

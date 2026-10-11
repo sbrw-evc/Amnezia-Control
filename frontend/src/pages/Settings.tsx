@@ -6,6 +6,7 @@ import { useAction } from "@/lib/hooks";
 import type { Settings } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { Badge, Card, Field, Page, PageHeader } from "@/components/ui/Primitives";
+import PasswordInput from "@/components/ui/PasswordInput";
 import { Skeleton } from "@/components/ui/Feedback";
 
 type Def = { key: string; label: string; hint?: string; type: "text" | "number" | "bool" | "select"; options?: [string, string][] };
@@ -54,7 +55,7 @@ function TelegramCard({ isAdmin }: { isAdmin: boolean }) {
         <p className="text-xs text-slate-500">Создайте бота у @BotFather и вставьте токен. Он будет сохранён в OpenBao и больше не отображается.</p>
         {isAdmin && <>
           <div className="flex gap-2">
-            <input className="input mono" type="password" placeholder="123456:ABC-DEF…" value={token} onChange={(e) => setToken(e.target.value)} />
+            <PasswordInput className="mono" placeholder="123456:ABC-DEF…" value={token} onChange={(e) => setToken(e.target.value)} />
             <button className="btn-ghost" disabled={!token || save.isPending} onClick={() => save.mutate(token)}><Save size={14} /></button>
           </div>
           <button className="btn-ghost btn-sm" disabled={!status.data?.configured || test.isPending} onClick={() => test.mutate(undefined)}><Send size={12} /> Тестовое сообщение</button>

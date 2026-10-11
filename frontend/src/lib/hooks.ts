@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { notify } from "./notify";
 
 export function useAction<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>, opts: {
   success?: string | ((r: TResult) => string);
@@ -10,19 +10,19 @@ export function useAction<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>,
   return useMutation({
     mutationFn: fn,
     onSuccess: (r) => {
-      if (opts.success) toast.success(typeof opts.success === "function" ? opts.success(r) : opts.success);
+      if (opts.success) notify.success(typeof opts.success === "function" ? opts.success(r) : opts.success);
       opts.invalidate?.forEach((k) => qc.invalidateQueries({ queryKey: k }));
       opts.onSuccess?.(r);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => notify.error("Действие не выполнено", e.message),
   });
 }
 
 export async function copyText(text: string, label = "Скопировано") {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success(label);
+    notify.success(label);
   } catch {
-    toast.error("Буфер обмена недоступен (нужен HTTPS или localhost)");
+    notify.error("Буфер обмена недоступен", "Нужен HTTPS или localhost");
   }
 }

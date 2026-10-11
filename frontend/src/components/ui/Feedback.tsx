@@ -32,9 +32,11 @@ export function EmptyState({ title, hint, icon }: { title: string; hint?: string
 }
 
 export function ErrorState({ error }: { error: unknown }) {
+  void error;
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-      <AlertTriangle size={18} /> {error instanceof Error ? error.message : "Не удалось загрузить данные"}
+    <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-sm text-slate-500">
+      <div className="rounded-full bg-base-800 p-3"><AlertTriangle size={20} /></div>
+      Данные недоступны — подробности в уведомлениях
     </div>
   );
 }

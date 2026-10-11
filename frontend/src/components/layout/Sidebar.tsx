@@ -13,6 +13,7 @@ import { ROLE_LABEL } from "@/lib/format";
 import { useAuth } from "@/store/auth";
 import type { Role } from "@/lib/types";
 import { StatusDot } from "@/components/ui/Primitives";
+import { NotificationBell } from "./NotificationCenter";
 
 interface Item { to: string; label: string; icon: ReactNode; role?: Role; badge?: number }
 
@@ -23,7 +24,7 @@ function useAlertCount() {
   return { total: (a.critical ?? 0) + (a.warning ?? 0) + (a.info ?? 0), critical: a.critical ?? 0 };
 }
 
-export default function Sidebar({ collapsed, onToggle, onNavigate }: { collapsed: boolean; onToggle: () => void; onNavigate?: () => void }) {
+export default function Sidebar({ collapsed, onToggle, onNavigate, onNotifications }: { collapsed: boolean; onToggle: () => void; onNavigate?: () => void; onNotifications: () => void }) {
   const { user, can, logout } = useAuth();
   const alerts = useAlertCount();
   const [connected, setConnected] = useState(true);
@@ -119,7 +120,8 @@ export default function Sidebar({ collapsed, onToggle, onNavigate }: { collapsed
           <span className="flex items-center gap-2 px-2 text-[11px] text-slate-500" title={connected ? "Live-поток подключён" : "Переподключение…"}>
             <StatusDot on={connected} warn={!connected} /> {!collapsed && (connected ? "Live" : "Офлайн")}
           </span>
-          <div className="flex gap-1">
+          <div className={clsx("flex gap-1", collapsed && "flex-col items-center")}>
+            <NotificationBell collapsed={collapsed} onOpen={onNotifications} />
             <button onClick={onToggle} className="hidden rounded-md p-1.5 text-slate-400 hover:bg-base-800 hover:text-white lg:block" title="Свернуть">
               <motion.span animate={{ rotate: collapsed ? 180 : 0 }} className="block"><ChevronsLeft size={16} /></motion.span>
             </button>
