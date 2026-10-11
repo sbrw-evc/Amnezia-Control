@@ -13,7 +13,7 @@ from .domain.errors import DomainError
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-VERSION = "2.1.0"
+VERSION = "1.0.0"
 
 
 @asynccontextmanager

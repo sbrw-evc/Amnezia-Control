@@ -73,6 +73,20 @@ nano .env                 # AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_
 
 Пошагово — [Установка](https://github.com/sbrw-evc/Amnezia-Control/wiki/ru-Installation).
 
+## Docker-образы
+
+Каждый релиз публикует образы в GitHub Container Registry (теги `X.Y.Z`, `X.Y`, `latest`):
+
+| Образ | Платформы |
+|---|---|
+| `ghcr.io/sbrw-evc/amnezia-control-backend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-frontend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-flow-collector` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-awg-client` | linux/amd64 |
+
+Версия задаётся `AC_VERSION` в `.env`; `install.sh` скачивает образы, `docker compose up -d --build` собирает их локально.
+На странице релиза также есть `amnezia-control-X.Y.Z-deploy.tar.gz` — всё необходимое для запуска без клонирования репозитория.
+
 ## Разработка
 
 ```bash

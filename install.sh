@@ -10,11 +10,11 @@ if [ ! -f .env ]; then
   sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(secret)/" .env
   sed -i "s/^CLICKHOUSE_PASSWORD=.*/CLICKHOUSE_PASSWORD=$(secret)/" .env
   chmod 600 .env
-  echo "Создан .env — укажите AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR и запустите install.sh снова."
+  echo "Created .env — set AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_BASE_URL and run install.sh again."
   exit 0
 fi
 
-grep -q '^AWG_HOST=203.0.113.10' .env && { echo "Укажите AWG_HOST в .env"; exit 1; }
+grep -q "^AWG_HOST=203.0.113.10" .env && { echo "Set AWG_HOST in .env"; exit 1; }
 
 mkdir -p data/postgres data/openbao data/bao-init data/approle data/backend data/clickhouse data/geoip data/tiles \
   openbao/keys awg-client/config
@@ -30,11 +30,12 @@ chmod 400 openbao/keys/unseal.key
 chown 101:101 data/tiles
 
 if [ ! -s awg-client/config/awg0.conf ]; then
-  echo "Внимание: нет awg-client/config/awg0.conf — шлюз не поднимется, пока вы не создадите для него клиента."
+  echo "Note: awg-client/config/awg0.conf is missing — the gateway tunnel will not start until you create a client for it in the panel."
 fi
 
-docker compose up -d --build
+docker compose pull --ignore-pull-failures --quiet || true
+docker compose up -d
 echo
-echo "Amnezia Control запущен: $(sed -n 's/^PUBLIC_BASE_URL=//p' .env)"
-echo "Логин: $(sed -n 's/^INITIAL_ADMIN_USER=//p' .env), пароль: см. INITIAL_ADMIN_PASSWORD в .env"
-echo "Сохраните openbao/keys/unseal.key и data/bao-init/init.json в надёжном месте."
+echo "Amnezia Control is running: $(sed -n 's/^PUBLIC_BASE_URL=//p' .env)"
+echo "Login: $(sed -n 's/^INITIAL_ADMIN_USER=//p' .env), password: INITIAL_ADMIN_PASSWORD from .env (you will be asked to change it)"
+echo "Back up openbao/keys/unseal.key and data/bao-init/init.json to a safe place."

@@ -47,10 +47,21 @@ On MikroTik:
 ## Installing the panel
 
 ```bash
-git clone https://github.com/sbrw-evc/Amnezia-Control.git /opt/amnezia-control
-cd /opt/amnezia-control
+mkdir -p /opt/amnezia-control && cd /opt/amnezia-control
+curl -L https://github.com/sbrw-evc/Amnezia-Control/releases/download/v1.0.0/amnezia-control-1.0.0-deploy.tar.gz   | tar xz --strip-components=1
 ./install.sh
 ```
+
+Or clone the repository: `git clone https://github.com/sbrw-evc/Amnezia-Control.git /opt/amnezia-control`.
+
+`install.sh` pulls prebuilt images from GitHub Container Registry; the version is set by `AC_VERSION` in `.env`:
+
+| Image | Platforms |
+|---|---|
+| `ghcr.io/sbrw-evc/amnezia-control-backend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-frontend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-flow-collector` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-awg-client` | linux/amd64 |
 
 The first run creates `.env` with random passwords. Fill in the addresses (see [[Configuration]]) and run `./install.sh` again:
 it creates the data directories and the OpenBao unseal key, sets permissions and starts the stack.
@@ -67,11 +78,15 @@ After the start:
 
 ## Updating
 
+Set the new version in `.env` and pull the images:
+
 ```bash
 cd /opt/amnezia-control
-git pull
-docker compose up -d --build
+sed -i 's/^AC_VERSION=.*/AC_VERSION=1.0.0/' .env
+docker compose pull && docker compose up -d
 ```
+
+When installed from the repository, `git pull && docker compose up -d --build` builds the images locally.
 
 PostgreSQL and ClickHouse schemas are updated automatically.
 

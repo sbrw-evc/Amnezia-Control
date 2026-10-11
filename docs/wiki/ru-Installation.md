@@ -47,10 +47,21 @@ ssh-copy-id root@<VPS>
 ## Установка панели
 
 ```bash
-git clone https://github.com/sbrw-evc/Amnezia-Control.git /opt/amnezia-control
-cd /opt/amnezia-control
+mkdir -p /opt/amnezia-control && cd /opt/amnezia-control
+curl -L https://github.com/sbrw-evc/Amnezia-Control/releases/download/v1.0.0/amnezia-control-1.0.0-deploy.tar.gz   | tar xz --strip-components=1
 ./install.sh
 ```
+
+Или клонируйте репозиторий: `git clone https://github.com/sbrw-evc/Amnezia-Control.git /opt/amnezia-control`.
+
+`install.sh` скачивает готовые образы из GitHub Container Registry; версия задаётся `AC_VERSION` в `.env`:
+
+| Образ | Платформы |
+|---|---|
+| `ghcr.io/sbrw-evc/amnezia-control-backend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-frontend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-flow-collector` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-awg-client` | linux/amd64 |
 
 Первый запуск создаёт `.env` со случайными паролями. Заполните адреса (см. [[Конфигурация|ru-Configuration]]) и запустите `./install.sh` ещё раз:
 он создаст каталоги данных и ключ распечатки OpenBao, выставит права и поднимет стек.
@@ -67,11 +78,15 @@ cd /opt/amnezia-control
 
 ## Обновление
 
+Укажите новую версию в `.env` и скачайте образы:
+
 ```bash
 cd /opt/amnezia-control
-git pull
-docker compose up -d --build
+sed -i 's/^AC_VERSION=.*/AC_VERSION=1.0.0/' .env
+docker compose pull && docker compose up -d
 ```
+
+При установке из репозитория `git pull && docker compose up -d --build` соберёт образы локально.
 
 Схемы PostgreSQL и ClickHouse обновляются автоматически.
 

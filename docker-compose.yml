@@ -3,6 +3,7 @@ name: amnezia-control
 services:
   awg-client:
     build: ./awg-client
+    image: ghcr.io/sbrw-evc/amnezia-control-awg-client:${AC_VERSION:-1.0.0}
     container_name: ac-awg-client
     network_mode: host
     cap_add: [NET_ADMIN]
@@ -74,6 +75,7 @@ services:
 
   flow-collector:
     build: ./flow-collector
+    image: ghcr.io/sbrw-evc/amnezia-control-flow-collector:${AC_VERSION:-1.0.0}
     container_name: ac-flow-collector
     environment:
       CLICKHOUSE_URL: http://clickhouse:8123
@@ -90,6 +92,7 @@ services:
 
   backend:
     build: ./backend
+    image: ghcr.io/sbrw-evc/amnezia-control-backend:${AC_VERSION:-1.0.0}
     container_name: ac-backend
     env_file: .env
     environment:
@@ -109,6 +112,7 @@ services:
 
   frontend:
     build: ./frontend
+    image: ghcr.io/sbrw-evc/amnezia-control-frontend:${AC_VERSION:-1.0.0}
     container_name: ac-frontend
     ports: ["${PANEL_PORT:-8080}:80"]
     volumes: ["./data/tiles:/var/cache/nginx/tiles"]

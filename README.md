@@ -73,6 +73,20 @@ Panel: `http://<GATEWAY_IP>:8080`, login `admin`, password — `INITIAL_ADMIN_PA
 
 Step by step — [Installation](https://github.com/sbrw-evc/Amnezia-Control/wiki/Installation).
 
+## Docker images
+
+Every release publishes images to GitHub Container Registry (tags `X.Y.Z`, `X.Y`, `latest`):
+
+| Image | Platforms |
+|---|---|
+| `ghcr.io/sbrw-evc/amnezia-control-backend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-frontend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-flow-collector` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/amnezia-control-awg-client` | linux/amd64 |
+
+The version is set by `AC_VERSION` in `.env`; `install.sh` pulls the images, `docker compose up -d --build` builds them locally.
+The release page also has `amnezia-control-X.Y.Z-deploy.tar.gz` — everything needed to run the stack without cloning the repository.
+
 ## Development
 
 ```bash
