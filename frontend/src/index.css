@@ -1,0 +1,43 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import "leaflet/dist/leaflet.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body { font-feature-settings: "cv11", "ss01"; }
+  ::selection { background: rgba(59, 130, 246, .35); }
+  * { scrollbar-width: thin; scrollbar-color: #334160 transparent; }
+}
+
+@layer components {
+  .card { @apply rounded-xl border border-base-700/70 bg-base-900/80 backdrop-blur-sm; }
+  .card-head { @apply flex items-center justify-between gap-3 border-b border-base-700/60 px-4 py-3; }
+  .card-title { @apply text-[13px] font-semibold uppercase tracking-wide text-slate-400; }
+  .input { @apply w-full rounded-lg border border-base-700 bg-base-950/70 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-accent focus:ring-2 focus:ring-accent/25; }
+  .label { @apply mb-1 block text-xs font-medium text-slate-400; }
+  .btn { @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium transition active:scale-[.98] disabled:pointer-events-none disabled:opacity-50; }
+  .btn-primary { @apply btn border-accent bg-accent text-white hover:bg-blue-500 shadow-glow; }
+  .btn-ghost { @apply btn border-base-700 bg-base-850 text-slate-200 hover:border-base-600 hover:bg-base-800; }
+  .btn-danger { @apply btn border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20; }
+  .btn-sm { @apply px-2.5 py-1.5 text-xs; }
+  .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-base-700 bg-base-850 px-2.5 py-1 text-xs text-slate-300 transition hover:border-base-600; }
+  .chip-on { @apply border-accent/60 bg-accent/15 text-blue-200; }
+  .table-ac { @apply w-full text-sm; }
+  .table-ac thead th { @apply sticky top-0 z-10 bg-base-900/95 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 backdrop-blur; }
+  .table-ac tbody td { @apply whitespace-nowrap border-t border-base-700/50 px-3 py-2.5 align-middle; }
+  .table-ac thead th { @apply whitespace-nowrap; }
+  .table-ac tbody tr { @apply transition-colors hover:bg-base-800/60; }
+  .mono { @apply font-mono text-[12px]; }
+}
+
+.leaflet-container { background: #0b1120; font-family: inherit; }
+
+.osm-dark { filter: invert(1) hue-rotate(195deg) brightness(.85) contrast(.9) saturate(.6); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #131c31; color: #e2e8f0; border: 1px solid #243049; }
+.leaflet-control-attribution { background: rgba(11,17,32,.75) !important; color: #64748b !important; }
+.leaflet-control-attribution a { color: #93c5fd !important; }
+.leaflet-bar a, .leaflet-control-layers { background: #131c31 !important; color: #e2e8f0 !important; border-color: #243049 !important; }
+.qr svg { width: 100%; height: auto; background: #fff; border-radius: .75rem; padding: .5rem; }

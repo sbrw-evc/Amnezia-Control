@@ -1,0 +1,122 @@
+name: amnezia-control
+
+services:
+  awg-client:
+    build: ./awg-client
+    container_name: ac-awg-client
+    network_mode: host
+    cap_add: [NET_ADMIN]
+    devices: ["/dev/net/tun:/dev/net/tun"]
+    volumes: ["./awg-client/config:/config"]
+    environment:
+      LAN_IF: ${LAN_IF:-eth0}
+      TUNNEL_NET: ${TUNNEL_NET:-10.8.1.0/24}
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ac-postgres
+    environment:
+      POSTGRES_DB: amnezia
+      POSTGRES_USER: amnezia
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: ["./data/postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amnezia -d amnezia"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [internal]
+
+  openbao:
+    image: openbao/openbao:${OPENBAO_VERSION:-2.6.2}
+    container_name: ac-openbao
+    command: ["server", "-config=/openbao/config/config.hcl"]
+    cap_add: [IPC_LOCK]
+    volumes:
+      - ./openbao/config.hcl:/openbao/config/config.hcl:ro
+      - ./openbao/keys:/openbao/keys:ro
+      - ./data/openbao:/openbao/data
+    restart: unless-stopped
+    networks: [internal]
+
+  bao-init:
+    image: openbao/openbao:${OPENBAO_VERSION:-2.6.2}
+    container_name: ac-bao-init
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    volumes:
+      - ./openbao/bootstrap.sh:/bootstrap.sh:ro
+      - ./data/bao-init:/bao/init
+      - ./data/approle:/bao/approle
+      - ${SSH_KEY_FILE:-/root/.ssh/id_ed25519}:/import/ssh_key:ro
+    depends_on: [openbao]
+    restart: "no"
+    networks: [internal]
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.8}
+    container_name: ac-clickhouse
+    environment:
+      CLICKHOUSE_DB: flows
+      CLICKHOUSE_USER: amnezia
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+      TZ: UTC
+    volumes:
+      - ./data/clickhouse:/var/lib/clickhouse
+      - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/amnezia-control.xml:ro
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/amnezia-control.xml:ro
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    restart: unless-stopped
+    networks: [internal]
+
+  flow-collector:
+    build: ./flow-collector
+    container_name: ac-flow-collector
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: amnezia
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      LAN_CIDR: ${LAN_CIDR:-192.168.0.0/24}
+      GATEWAY_IP: ${GATEWAY_IP:-192.168.0.210}
+      AWG_HOST: ${AWG_HOST}
+    ports: ["${FLOW_PORT:-2055}:2055/udp"]
+    volumes: ["./data/geoip:/data"]
+    depends_on: [clickhouse]
+    restart: unless-stopped
+    networks: [internal, egress]
+
+  backend:
+    build: ./backend
+    container_name: ac-backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://amnezia:${POSTGRES_PASSWORD}@postgres:5432/amnezia
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: amnezia
+    volumes:
+      - ./data/approle:/bao/approle:ro
+      - ./data/backend:/data
+    tmpfs: ["/run/panel:mode=0700"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      bao-init: { condition: service_completed_successfully }
+      clickhouse: { condition: service_started }
+    restart: unless-stopped
+    networks: [internal, egress]
+
+  frontend:
+    build: ./frontend
+    container_name: ac-frontend
+    ports: ["${PANEL_PORT:-8080}:80"]
+    volumes: ["./data/tiles:/var/cache/nginx/tiles"]
+    depends_on: [backend]
+    restart: unless-stopped
+    networks: [internal, egress]
+
+networks:
+  internal:
+    internal: true
+  egress: {}

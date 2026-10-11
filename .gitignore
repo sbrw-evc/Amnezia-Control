@@ -1,0 +1,11 @@
+.env
+data/
+openbao/keys/
+awg-client/config/*.conf
+node_modules/
+frontend/dist/
+__pycache__/
+*.pyc
+*.tgz
+.DS_Store
+
