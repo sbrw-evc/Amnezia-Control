@@ -121,6 +121,7 @@ class Container:
             PeriodicJob("policy", 60, self.policy.run, initial_delay=20),
             PeriodicJob("health", 60, self.health.run, initial_delay=30),
             PeriodicJob("router", 60, self.routing.monitor, initial_delay=10),
+            PeriodicJob("custom-domains", 3600, self.routing.refresh_domains, initial_delay=900),
             PeriodicJob("geoip", 86400, self.geo.refresh, initial_delay=86400),
             PeriodicJob("purge", 3600, purge, initial_delay=600),
             PeriodicJob("backup", 86400, self.backups.scheduled, initial_delay=1800),
@@ -134,7 +135,7 @@ class Container:
         if int(rows[0]["n"]) == 0:
             customs = await self.routing.custom_list()
             if customs:
-                await self.flows.add_sites([(c["cidr"], c["comment"] or c["cidr"], "custom") for c in customs])
+                await self.flows.add_sites(self.routing.custom_sites(customs))
         self.flows.sites_seeded = True
 
     async def _lose_leadership(self) -> None:

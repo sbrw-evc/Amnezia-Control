@@ -20,7 +20,7 @@ class TelegramIn(BaseModel):
 
 
 class CustomPrefixIn(BaseModel):
-    target: str = Field(min_length=1, max_length=64)
+    target: str = Field(min_length=1, max_length=253)
     comment: str = ""
 
 

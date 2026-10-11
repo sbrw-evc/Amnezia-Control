@@ -28,8 +28,13 @@ The page shows the number of sites and prefixes, the share of the IPv4 address s
 
 ## Custom addresses through the VPN
 
-Public IPv4 addresses or prefixes that should go through the VPN in addition to the list. They are stored in the panel,
+Domains, public IPv4 addresses or prefixes that should go through the VPN in addition to the list. They are stored in the panel,
 added to the router immediately and kept across subsequent list uploads.
+
+A domain (`example.com`, a URL is accepted too) is added to `vpn-sites` as a DNS name: MikroTik resolves it with its own DNS —
+the same one LAN devices use — and keeps dynamic entries with the current addresses according to the record TTL.
+Each name is a separate entry: `www.example.com` or `api.example.com` must be added separately.
+The panel resolves the domain over DoH once an hour only to label flows in [[Flows]].
 
 ## Where will the traffic go
 

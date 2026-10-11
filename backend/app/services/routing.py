@@ -13,6 +13,7 @@ from ..db.base import Database
 from ..db.repositories import SettingRepo
 from ..domain.errors import DomainError, ExternalServiceError
 from ..domain.models import Severity
+from ..domain.net import HOST_RE
 from ..ports import RouterGateway
 from .alerts import AlertService
 from .audit import AuditService
@@ -103,7 +104,7 @@ class RoutingService:
         count = await self._router.replace_address_list(sorted(set(cidrs) | {c["cidr"] for c in customs}))
         self._list_cache = None
         if self.flows:
-            await self.flows.load_sites(per_site + [(c["cidr"], c["comment"] or c["cidr"], "custom") for c in customs])
+            await self.flows.load_sites(per_site + self.custom_sites(customs))
         meta = {k: v for k, v in summary.items() if k != "site_names"}
         async with self._db.session() as s:
             await SettingRepo(s).put(SITE_LIST_KEY, summary)
@@ -122,36 +123,96 @@ class RoutingService:
         async with self._db.session() as s:
             await SettingRepo(s).put(CUSTOM_KEY, items)
 
-    async def add_custom(self, actor: Actor, target: str, comment: str) -> dict:
+    @staticmethod
+    def custom_sites(items: list[dict]) -> list[tuple[str, str, str]]:
+        rows = []
+        for i in items:
+            label = i["comment"] or i["cidr"]
+            if i.get("kind") == "domain":
+                rows.extend((f"{ip}/32", label, "custom") for ip in i.get("ips") or [])
+            else:
+                rows.append((i["cidr"], label, "custom"))
+        return rows
+
+    @staticmethod
+    def _host(target: str) -> str:
+        target = target.strip().lower()
+        for prefix in ("https://", "http://"):
+            target = target.removeprefix(prefix)
+        return target.split("/")[0].split(":")[0].rstrip(".")
+
+    async def _parse_target(self, target: str) -> tuple[str, str, list[str]]:
         try:
             net = ipaddress.ip_network(target.strip(), strict=False)
         except ValueError:
-            raise DomainError("Укажите IPv4-адрес или подсеть, например 203.0.113.0/24")
-        if net.version != 4 or any(net.overlaps(e) for e in EXCLUDE):
-            raise DomainError("Допустимы только публичные IPv4-адреса")
-        cidr = str(net)
+            net = None
+        if net is not None:
+            if net.version != 4 or any(net.overlaps(e) for e in EXCLUDE):
+                raise DomainError("Допустимы только публичные IPv4-адреса")
+            return str(net), "prefix", []
+        host = self._host(target)
+        if not HOST_RE.fullmatch(host):
+            raise DomainError("Укажите домен (example.com), IPv4-адрес или подсеть (203.0.113.0/24)")
+        ips = await self._public_ips(host)
+        if not ips:
+            raise DomainError(f"{host} указывает только на локальные адреса — через VPN его не направить")
+        return host, "domain", ips
+
+    async def add_custom(self, actor: Actor, target: str, comment: str) -> dict:
+        cidr, kind, ips = await self._parse_target(target)
         items = await self.custom_list()
         if any(i["cidr"] == cidr for i in items):
-            raise DomainError("Такая подсеть уже добавлена")
+            raise DomainError("Такой адрес уже добавлен")
         await self._router.add_address(cidr)
-        item = {"cidr": cidr, "comment": comment.strip()[:128], "added_by": actor.username, "added_at": utcnow().isoformat()}
+        item = {"cidr": cidr, "kind": kind, "comment": comment.strip()[:128], "added_by": actor.username,
+                "added_at": utcnow().isoformat()}
+        if ips:
+            item["ips"] = ips
         await self._save_custom(items + [item])
         self._list_cache = None
         if self.flows:
-            await self.flows.add_sites([(cidr, item["comment"] or cidr, "custom")])
+            await self.flows.add_sites(self.custom_sites([item]))
         async with self._db.session() as s:
-            self._audit.record(s, actor, "routing.custom_added", "router", "", cidr, comment=item["comment"])
+            self._audit.record(s, actor, "routing.custom_added", "router", "", cidr, comment=item["comment"], kind=kind)
         return item
+
+    async def _public_ips(self, host: str) -> list[str]:
+        return [ip for ip in await self._resolve(host) if not any(ipaddress.ip_address(ip) in e for e in EXCLUDE)]
+
+    async def refresh_domains(self) -> None:
+        resolved = {}
+        for i in await self.custom_list():
+            if i.get("kind") == "domain":
+                try:
+                    resolved[i["cidr"]] = await self._public_ips(i["cidr"])
+                except DomainError:
+                    continue
+        items, changed = await self.custom_list(), []
+        for i in items:
+            ips = resolved.get(i["cidr"])
+            if ips and set(ips) != set(i.get("ips") or []):
+                changed.append((dict(i), i))
+                i["ips"] = ips
+        if not changed:
+            return
+        await self._save_custom(items)
+        if self.flows:
+            for old, new in changed:
+                for prefix, _, _ in self.custom_sites([old]):
+                    await self.flows.remove_site(prefix)
+                await self.flows.add_sites(self.custom_sites([new]))
 
     async def remove_custom(self, actor: Actor, cidr: str) -> None:
         items = await self.custom_list()
-        if not any(i["cidr"] == cidr for i in items):
-            raise DomainError("Подсеть не найдена")
+        item = next((i for i in items if i["cidr"] == cidr), None)
+        if not item:
+            raise DomainError("Адрес не найден")
         await self._router.remove_address(cidr)
         await self._save_custom([i for i in items if i["cidr"] != cidr])
         self._list_cache = None
         if self.flows:
-            await self.flows.remove_site(cidr)
+            for prefix, _, _ in self.custom_sites([item]):
+                await self.flows.remove_site(prefix)
         async with self._db.session() as s:
             self._audit.record(s, actor, "routing.custom_removed", "router", "", cidr)
 
@@ -181,10 +242,7 @@ class RoutingService:
         return sorted(ips)
 
     async def check(self, target: str) -> dict:
-        target = target.strip().lower()
-        for prefix in ("https://", "http://"):
-            target = target.removeprefix(prefix)
-        target = target.split("/")[0].split(":")[0]
+        target = self._host(target)
         if not target:
             raise DomainError("Укажите домен или IP")
         try:
@@ -197,4 +255,5 @@ class RoutingService:
             addr = ipaddress.ip_address(ip)
             match = next((n for n in nets if addr in n), None)
             result.append({"ip": ip, "via_vpn": match is not None, "prefix": str(match) if match else None})
-        return {"target": target, "ips": result, "via_vpn": any(r["via_vpn"] for r in result)}
+        rule = next((i["cidr"] for i in await self.custom_list() if i.get("kind") == "domain" and i["cidr"] == target), None)
+        return {"target": target, "ips": result, "rule": rule, "via_vpn": bool(rule) or any(r["via_vpn"] for r in result)}

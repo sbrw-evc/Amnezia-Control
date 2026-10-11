@@ -21,7 +21,7 @@ Telegram alerts, backups and secret storage in OpenBao.
 - **Flow analytics** — NetFlow v9 from MikroTik into ClickHouse; overview, visualization (stacked / 100% / lines / grid / sankey),
   dimensions, top by average / peak / last, bidirectional mode, previous-period comparison, a filter language,
   saved filters, state in the URL.
-- **Routing** — tunnel status on MikroTik, site list upload (`ip-list.json`), custom prefixes,
+- **Routing** — tunnel status on MikroTik, site list upload (`ip-list.json`), custom domains and prefixes,
   "where will this traffic go" check, automatic fallback to the ISP when the tunnel is down.
 - **AWG server** — obfuscation parameters, an `awg0.conf` editor with backups that applies changes without dropping connections.
 - **Security** — roles (administrator / operator / viewer), argon2, 2FA (TOTP), revocable sessions,

@@ -1,5 +1,6 @@
 import re
 
+from ..domain.net import HOST_RE, IP_RE
 from ..ports import CommandRunner, RouterGateway
 
 LIST = "vpn-sites"
@@ -41,15 +42,18 @@ class MikrotikSshRouter(RouterGateway):
 
     @staticmethod
     def _validate(cidr: str) -> str:
-        if not re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}(/\d{1,2})?", cidr):
-            raise ValueError(f"bad prefix {cidr}")
+        if not (IP_RE.fullmatch(cidr) or HOST_RE.fullmatch(cidr)):
+            raise ValueError(f"bad address {cidr}")
         return cidr
 
-    async def list_addresses(self) -> list[str]:
+    async def _entries(self, where: str = "") -> list[str]:
         out = await self._ssh.run(
-            f':foreach i in=[/ip firewall address-list find list={LIST}] do={{'
+            f':foreach i in=[/ip firewall address-list find list={LIST}{where}] do={{'
             f':put [/ip firewall address-list get $i address]}}', timeout=120)
         return [self._norm(x.strip()) for x in out.splitlines() if x.strip()]
+
+    async def list_addresses(self) -> list[str]:
+        return [x for x in await self._entries() if IP_RE.fullmatch(x)]
 
     async def add_address(self, cidr: str) -> None:
         c = self._norm(self._validate(cidr))
@@ -57,16 +61,16 @@ class MikrotikSshRouter(RouterGateway):
 
     async def remove_address(self, cidr: str) -> None:
         c = self._norm(self._validate(cidr))
-        await self._ssh.run(f"/ip firewall address-list remove [find list={LIST} address={c}]")
+        await self._ssh.run(f"/ip firewall address-list remove [find list={LIST} address={c} dynamic=no]")
 
     async def replace_address_list(self, cidrs: list[str]) -> int:
         for c in cidrs:
             self._validate(c)
-        current = set(await self.list_addresses())
+        current = set(await self._entries(" dynamic=no"))
         wanted = {self._norm(c) for c in cidrs}
         stale, new = sorted(current - wanted), sorted(wanted - current)
         for batch in self._chunks(stale):
-            cmds = "; ".join(f"remove [find list={LIST} address={c}]" for c in batch)
+            cmds = "; ".join(f"remove [find list={LIST} address={c} dynamic=no]" for c in batch)
             await self._ssh.run(f"/ip firewall address-list {{ {cmds} }}", timeout=180)
         for batch in self._chunks(new):
             cmds = "; ".join(f"add list={LIST} address={c}" for c in batch)

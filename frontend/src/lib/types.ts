@@ -202,8 +202,8 @@ export interface ApiTokenInfo {
 }
 
 export interface BackupItem { name: string; size: number; created_at: string }
-export interface CustomPrefix { cidr: string; comment: string; added_by: string; added_at: string }
-export interface RouteCheck { target: string; via_vpn: boolean; ips: { ip: string; via_vpn: boolean; prefix: string | null }[] }
+export interface CustomPrefix { cidr: string; kind?: "prefix" | "domain"; ips?: string[]; comment: string; added_by: string; added_at: string }
+export interface RouteCheck { target: string; via_vpn: boolean; rule?: string | null; ips: { ip: string; via_vpn: boolean; prefix: string | null }[] }
 
 export interface FlowField { name: string; label: string; kind: string }
 export interface FlowStatus { flows_per_second: number; last_flow: string | null; total_flows: number; disk_bytes: number; ok: boolean }

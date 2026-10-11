@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Globe2, Network, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Fmt } from "@/lib/format";
@@ -22,7 +22,8 @@ export function RouteChecker() {
       {result && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-3 space-y-2 text-sm">
           <div className="flex items-center gap-2"><span className="text-slate-300">{result.target}</span>
-            {result.via_vpn ? <Badge tone="violet">через VPN</Badge> : <Badge tone="slate">напрямую</Badge>}</div>
+            {result.via_vpn ? <Badge tone="violet">через VPN</Badge> : <Badge tone="slate">напрямую</Badge>}
+            {result.rule && <Badge tone="blue">правило домена</Badge>}</div>
           {result.ips.map((i) => (
             <div key={i.ip} className="flex items-center justify-between text-xs">
               <span className="mono text-slate-400">{i.ip}</span>
@@ -41,23 +42,26 @@ export function CustomPrefixes({ isAdmin }: { isAdmin: boolean }) {
   const [target, setTarget] = useState("");
   const [comment, setComment] = useState("");
   const add = useAction(() => api.admin.addCustomPrefix(target, comment), {
-    success: "Подсеть добавлена в маршрутизацию через VPN", invalidate: [["custom-prefixes"], ["routing"]],
+    success: "Адрес добавлен в маршрутизацию через VPN", invalidate: [["custom-prefixes"], ["routing"]],
     onSuccess: () => { setTarget(""); setComment(""); },
   });
-  const remove = useAction((cidr: string) => api.admin.removeCustomPrefix(cidr), { success: "Подсеть удалена", invalidate: [["custom-prefixes"], ["routing"]] });
+  const remove = useAction((cidr: string) => api.admin.removeCustomPrefix(cidr), { success: "Адрес удалён", invalidate: [["custom-prefixes"], ["routing"]] });
   return (
     <Card title="Свои адреса через VPN" bodyClass="space-y-3 p-4">
       {isAdmin && (
         <form className="grid grid-cols-[1fr_1fr_auto] gap-2" onSubmit={(e) => { e.preventDefault(); add.mutate(undefined); }}>
-          <input className="input mono" placeholder="203.0.113.0/24" value={target} onChange={(e) => setTarget(e.target.value)} />
+          <input className="input mono" placeholder="example.com или 203.0.113.0/24" value={target} onChange={(e) => setTarget(e.target.value)} />
           <input className="input" placeholder="Комментарий" value={comment} onChange={(e) => setComment(e.target.value)} />
           <button className="btn-primary" disabled={!target || add.isPending}><Plus size={14} /></button>
         </form>
       )}
+      {isAdmin && <p className="text-[11px] text-slate-500">Домен резолвит роутер и сам обновляет его адреса; поддомены добавляются отдельно.</p>}
       <div className="space-y-1">
         {(list.data ?? []).map((c) => (
           <div key={c.cidr} className="flex items-center gap-2 rounded-md bg-base-950/50 px-2 py-1.5 text-sm">
-            <span className="mono text-slate-200">{c.cidr}</span>
+            <span className="text-slate-500">{c.kind === "domain" ? <Globe2 size={13} /> : <Network size={13} />}</span>
+            <span className="mono text-slate-200" title={c.ips?.join(", ")}>{c.cidr}</span>
+            {c.kind === "domain" && !!c.ips?.length && <Badge tone="slate">{c.ips.length} IP</Badge>}
             <span className="flex-1 truncate text-slate-400">{c.comment}</span>
             <span className="text-[11px] text-slate-600">{c.added_by} · {Fmt.ago(c.added_at)}</span>
             {isAdmin && <button className="p-1 text-slate-500 hover:text-red-300" onClick={async () => {
