@@ -1,14 +1,14 @@
-# Установка
+# Installation
 
-## Требования
+## Requirements
 
-- Сервер Amnezia (self-hosted) с контейнером AmneziaWG (`amnezia-awg2`, протокол AmneziaWG 2.x/3.x).
-- Хост шлюза в домашней сети: LXC (Proxmox) или VM с Docker 24+ и Compose v2; 2–3 ГБ ОЗУ, 10+ ГБ диска.
-  Для LXC: unprivileged, `nesting=1`, проброс `/dev/net/tun`.
-- MikroTik с RouterOS 7.
-- SSH-ключ на шлюзе (`/root/.ssh/id_ed25519`), добавленный на VPS (`root`) и на MikroTik (`admin`).
+- A self-hosted Amnezia server with an AmneziaWG container (`amnezia-awg2`, AmneziaWG protocol 2.x/3.x).
+- A gateway host on the home network: an LXC container (Proxmox) or a VM with Docker 24+ and Compose v2; 2–3 GB RAM, 10+ GB disk.
+  For LXC: unprivileged, `nesting=1`, `/dev/net/tun` passed through.
+- MikroTik with RouterOS 7.
+- An SSH key on the gateway (`/root/.ssh/id_ed25519`) authorized on the VPS (`root`) and on MikroTik (`admin`).
 
-### LXC в Proxmox
+### LXC on Proxmox
 
 ```bash
 pct create 210 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname amnezia-control \
@@ -19,7 +19,7 @@ pct start 210
 pct exec 210 -- bash -c "apt-get update && apt-get install -y docker.io docker-compose git openssh-client"
 ```
 
-В контейнере включите форвардинг:
+Enable forwarding inside the container:
 
 ```bash
 cat >/etc/sysctl.d/99-gw.conf <<EOF
@@ -30,21 +30,21 @@ EOF
 sysctl -p /etc/sysctl.d/99-gw.conf
 ```
 
-### SSH-ключ
+### SSH key
 
 ```bash
 ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519
 ssh-copy-id root@<VPS>
 ```
 
-На MikroTik:
+On MikroTik:
 
 ```
 /file add name=gw.pub contents="ssh-ed25519 AAAA... "
 /user ssh-keys import public-key-file=gw.pub user=admin
 ```
 
-## Установка панели
+## Installing the panel
 
 ```bash
 git clone https://github.com/sbrw-evc/Amnezia-Control.git /opt/amnezia-control
@@ -52,19 +52,20 @@ cd /opt/amnezia-control
 ./install.sh
 ```
 
-Первый запуск создаёт `.env` со случайными паролями. Заполните адреса (см. [[Configuration]]) и запустите `./install.sh` ещё раз:
-он создаст каталоги данных и ключ распечатки OpenBao, выставит права и поднимет стек.
+The first run creates `.env` with random passwords. Fill in the addresses (see [[Configuration]]) and run `./install.sh` again:
+it creates the data directories and the OpenBao unseal key, sets permissions and starts the stack.
 
-После запуска:
+After the start:
 
-1. Откройте `PUBLIC_BASE_URL`, войдите как `admin` с паролем `INITIAL_ADMIN_PASSWORD` и задайте свой пароль.
-2. **Клиенты VPN → Новый клиент** — создайте клиента для шлюза (например, `home-gateway`), скачайте `.conf`
-   и сохраните как `awg-client/config/awg0.conf`. Выполните `docker compose restart awg-client`.
-3. Импортируйте конфигурацию MikroTik — [[MikroTik]].
-4. **Маршрутизация → Загрузить ip-list.json** — список сайтов будет применён на роутере и загружен в ClickHouse.
-5. **Настройки → Telegram-бот** — при необходимости подключите уведомления.
+1. Open `PUBLIC_BASE_URL`, sign in as `admin` with the `INITIAL_ADMIN_PASSWORD` and set your own password.
+   From then on only the new password works.
+2. **VPN clients → New client** — create a client for the gateway (e.g. `home-gateway`), download the `.conf`
+   and save it as `awg-client/config/awg0.conf`. Run `docker compose restart awg-client`.
+3. Import the MikroTik configuration — see [[MikroTik]].
+4. **Routing → Upload ip-list.json** — the site list is applied on the router and loaded into ClickHouse.
+5. **Settings → Telegram bot** — optionally connect notifications.
 
-## Обновление
+## Updating
 
 ```bash
 cd /opt/amnezia-control
@@ -72,10 +73,10 @@ git pull
 docker compose up -d --build
 ```
 
-Схемы PostgreSQL и ClickHouse обновляются автоматически.
+PostgreSQL and ClickHouse schemas are updated automatically.
 
-## Что сохранить отдельно
+## Keep separately
 
-- `openbao/keys/unseal.key` — ключ автоматической распечатки OpenBao. Без него данные OpenBao и снапшоты не восстановить.
-- `data/bao-init/init.json` — root-токен и recovery-ключ OpenBao.
+- `openbao/keys/unseal.key` — the OpenBao auto-unseal key. Without it, OpenBao data and snapshots cannot be restored.
+- `data/bao-init/init.json` — OpenBao root token and recovery key.
 - `.env`.

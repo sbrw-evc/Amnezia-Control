@@ -1,30 +1,30 @@
-# Резервное копирование
+# Backups
 
-## Что входит в архив
+## What the archive contains
 
 `data/backend/backups/amnezia-control-YYYYMMDD-HHMMSS.tar.gz`:
 
-| Файл | Содержимое |
+| File | Contents |
 |---|---|
-| `manifest.json` | Версия формата, дата, количество строк по таблицам |
-| `database.json` | Все таблицы PostgreSQL |
-| `openbao.snap` | Raft-снапшот OpenBao (зашифрован ключом распечатки) |
+| `manifest.json` | Format version, date, row counts per table |
+| `database.json` | All PostgreSQL tables |
+| `openbao.snap` | OpenBao raft snapshot (encrypted with the unseal key) |
 
-Потоки ClickHouse в архив не входят — это аналитические данные с ограниченным сроком хранения.
+ClickHouse flows are not included — they are analytics data with a limited retention period.
 
-## Создание
+## Creating a backup
 
-- Автоматически раз в сутки (если включено в настройках), хранится `backup_keep` последних копий.
-- Вручную — **Резервные копии → Создать копию** или `docker compose exec backend python -m app.cli backup`.
-- Скачивание — кнопка в списке (фиксируется в аудите).
+- Automatically once a day (if enabled in settings); the last `backup_keep` backups are kept.
+- Manually — **Backups → Create backup** or `docker compose exec backend python -m app.cli backup`.
+- Download — the button in the list (recorded in the audit log).
 
-Отдельно храните `openbao/keys/unseal.key`, `data/bao-init/init.json` и `.env`.
+Keep `openbao/keys/unseal.key`, `data/bao-init/init.json` and `.env` separately.
 
-## Восстановление
+## Restore
 
-1. Разверните проект, верните `.env`, `openbao/keys/unseal.key` и `data/bao-init/init.json`.
-2. Запустите `postgres`, `openbao`, `bao-init`.
-3. Восстановите OpenBao:
+1. Deploy the project, put back `.env`, `openbao/keys/unseal.key` and `data/bao-init/init.json`.
+2. Start `postgres`, `openbao`, `bao-init`.
+3. Restore OpenBao:
 
    ```bash
    tar xzf amnezia-control-*.tar.gz openbao.snap
@@ -34,19 +34,19 @@
      ac-openbao bao operator raft snapshot restore -force /tmp/openbao.snap
    ```
 
-4. Восстановите базу (таблицы очищаются и заполняются из архива):
+4. Restore the database (tables are truncated and refilled from the archive):
 
    ```bash
    cp amnezia-control-*.tar.gz data/backend/backups/
    docker compose run --rm backend python -m app.cli restore-db /data/backups/amnezia-control-YYYYMMDD-HHMMSS.tar.gz
    ```
 
-5. Запустите остальные сервисы: `docker compose up -d`.
+5. Start the remaining services: `docker compose up -d`.
 
-## Сброс пароля администратора
+## Resetting the administrator password
 
 ```bash
 docker compose exec backend python -m app.cli reset-password admin
 ```
 
-Команда выводит временный пароль, завершает сессии пользователя и требует смены пароля при входе.
+The command prints a temporary password, ends the user's sessions and requires a password change at sign-in.

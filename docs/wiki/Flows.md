@@ -1,91 +1,91 @@
-# Анализ потоков
+# Flow analytics
 
-Модуль повторяет идеи [Akvorado](https://github.com/akvorado/akvorado) в облегчённом виде: без Kafka и отдельной
-оркестрации, с хранением в ClickHouse и консолью внутри панели.
+The module follows the ideas of [Akvorado](https://github.com/akvorado/akvorado) in a lightweight form: no Kafka and
+no separate orchestration, with storage in ClickHouse and the console built into the panel.
 
-## Конвейер
+## Pipeline
 
 ```
-MikroTik (Traffic Flow, NetFlow v9) ──UDP 2055──► goflow2 ──JSON──► обогащение ──batch──► ClickHouse.flows
+MikroTik (Traffic Flow, NetFlow v9) ──UDP 2055──► goflow2 ──JSON──► enrichment ──batch──► ClickHouse.flows
 ```
 
-Обогащение в `flow-collector`:
+Enrichment in `flow-collector`:
 
-| Поле | Источник |
+| Field | Source |
 |---|---|
-| `Direction` | `out` — источник в LAN, `in` — источник снаружи |
-| `Route` | `vpn` — next-hop = шлюз (исходящий) или получатель = адрес роутера в LAN (входящий через masquerade); иначе `direct` |
-| `LocalAddr` / `RemoteAddr` | Локальная и удалённая стороны с учётом направления |
+| `Direction` | `out` — source in the LAN, `in` — source outside |
+| `Route` | `vpn` — next hop = gateway (outbound) or destination = router's LAN address (inbound via masquerade); otherwise `direct` |
+| `LocalAddr` / `RemoteAddr` | Local and remote sides, taking direction into account |
 | `RemoteCountry` | DB-IP City Lite |
 | `RemoteAS` / `RemoteASName` | DB-IP ASN Lite |
-| `Bytes` / `Packets` | С учётом sampling rate |
+| `Bytes` / `Packets` | Adjusted for the sampling rate |
 
-Исключаются: трафик внутри LAN, транспорт туннеля к VPS, multicast/broadcast.
-Атрибуция сайтов выполняется при запросе через словарь ClickHouse `sites` (`ip_trie`), который заполняется при
-загрузке `ip-list.json` и добавлении своих подсетей — поэтому новое разбиение применяется и к старым данным.
+Excluded: traffic inside the LAN, tunnel transport to the VPS, multicast/broadcast.
+Site attribution happens at query time through the ClickHouse dictionary `sites` (`ip_trie`), which is filled when
+`ip-list.json` is uploaded and custom prefixes are added — so a new mapping applies to existing data as well.
 
-## Обзор
+## Overview
 
-Потоки в секунду, время последнего потока, доля трафика через VPN за 24 ч, объём базы; график за 24 часа;
-топ сайтов, AS, стран, протоколов, удалённых портов и устройств LAN за час; последний поток со всеми полями.
+Flows per second, time of the last flow, share of traffic through the VPN over 24 h, database size; a 24-hour chart;
+top sites, AS, countries, protocols, remote ports and LAN devices over the last hour; the last flow with all fields.
 
-## Визуализация
+## Visualization
 
-| Параметр | Значения |
+| Option | Values |
 |---|---|
-| Период | 15 мин … 30 дней, произвольный интервал, сдвиг назад/вперёд, отдаление, автообновление (10 с – 5 мин) |
-| Измерения | до 6, порядок меняется, кнопка разворота порядка |
-| Лимит | 1–50 серий, остальное — «Прочее» |
-| Топ по | среднему (`avg`), пикам (`max`), последним значениям (`last`) |
-| Единицы | бит/с, пакетов/с, потоков/с |
-| График | Stacked, 100%, Lines, Grid (малые графики), Sankey |
-| Двунаправленный | входящий трафик отображается отрицательными значениями |
-| Прошлый период | пунктир «всего» за предыдущий час / день / неделю / месяц / год |
+| Period | 15 min … 30 days, custom range, shift back/forward, zoom out, auto refresh (10 s – 5 min) |
+| Dimensions | up to 6, reorderable, a button to reverse the order |
+| Limit | 1–50 series, the rest is grouped as "Other" |
+| Top by | average (`avg`), peaks (`max`), latest values (`last`) |
+| Units | bits/s, packets/s, flows/s |
+| Graph | Stacked, 100%, Lines, Grid (small multiples), Sankey |
+| Bidirectional | inbound traffic is drawn as negative values |
+| Previous period | a dashed "total" line for the previous hour / day / week / month / year |
 
-Таблица под графиком: минимум, максимум, последнее, среднее, 95-й перцентиль, итог (байты / пакеты / потоки).
-Все параметры сохраняются в URL — ссылкой можно поделиться. `Ctrl+Enter` — применить.
+The table under the chart shows minimum, maximum, last, average, 95th percentile and total (bytes / packets / flows).
+All options are kept in the URL — you can share a link. `Ctrl+Enter` applies.
 
-### Измерения
+### Dimensions
 
 `Direction`, `Route`, `LocalAddr`, `RemoteAddr`, `RemoteNet` (/24), `RemoteAS`, `RemoteASName`, `RemoteCountry`,
 `Site`, `SiteGroup`, `Proto`, `LocalPort`, `RemotePort`.
 
-## Язык фильтров
+## Filter language
 
 ```
-условие  := Поле оператор значение | Поле IN (значение, ...) | Поле NOTIN (значение, ...)
-выражение := условие | NOT выражение | (выражение) | выражение AND выражение | выражение OR выражение
+condition  := Field operator value | Field IN (value, ...) | Field NOTIN (value, ...)
+expression := condition | NOT expression | (expression) | expression AND expression | expression OR expression
 ```
 
-| Тип поля | Операторы | Значения |
+| Field type | Operators | Values |
 |---|---|---|
-| Адрес (`LocalAddr`, `RemoteAddr`, `RemoteNet`) | `=`, `!=` | `203.0.113.5`, `203.0.113.0/24` |
-| AS (`RemoteAS`) | `=`, `!=`, `<`, `<=`, `>`, `>=`, `IN` | `AS13335` или `13335` |
-| Порт, протокол | числовые, `IN` | `443`; протокол — `tcp`, `udp`, `icmp` или номер |
-| Строки (`Site`, `RemoteCountry`, `RemoteASName`, `SiteGroup`) и `Direction`, `Route` | `=`, `!=`, `IN`, `NOTIN`, `LIKE`, `UNLIKE`, `ILIKE`, `IUNLIKE` | `vpn`, `'%google%'` |
+| Address (`LocalAddr`, `RemoteAddr`, `RemoteNet`) | `=`, `!=` | `203.0.113.5`, `203.0.113.0/24` |
+| AS (`RemoteAS`) | `=`, `!=`, `<`, `<=`, `>`, `>=`, `IN` | `AS13335` or `13335` |
+| Port, protocol | numeric, `IN` | `443`; protocol — `tcp`, `udp`, `icmp` or a number |
+| Strings (`Site`, `RemoteCountry`, `RemoteASName`, `SiteGroup`) and `Direction`, `Route` | `=`, `!=`, `IN`, `NOTIN`, `LIKE`, `UNLIKE`, `ILIKE`, `IUNLIKE` | `vpn`, `'%google%'` |
 
-Имена полей нечувствительны к регистру, строки — в одинарных или двойных кавычках, комментарии `--` и `/* */`.
-Все значения передаются в ClickHouse параметрами.
+Field names are case-insensitive, strings use single or double quotes, comments are `--` and `/* */`.
+All values are passed to ClickHouse as query parameters.
 
-Примеры:
+Examples:
 
 ```
 Route = vpn AND RemoteCountry IN (US, NL)
 Site LIKE '%google%' AND NOT Proto = udp
 Direction = out AND LocalAddr = 192.168.0.50
 RemoteAS = AS13335 OR RemoteASName ILIKE '%cloudflare%'
-Route = direct AND SiteGroup = video   -- сайты из списка, ушедшие мимо VPN
+Route = direct AND SiteGroup = video   -- listed sites that bypassed the VPN
 ```
 
-### Сохранённые фильтры
+### Saved filters
 
-Фильтр можно сохранить с названием; сохранённые фильтры видны всем операторам. Удалить может автор или администратор.
+A filter can be saved under a name; saved filters are visible to all operators. They can be deleted by their author or an administrator.
 
-## Последние потоки
+## Recent flows
 
-Таблица последних 200 потоков за час с фильтром и автообновлением.
+A table of the last 200 flows within the hour, with a filter and auto refresh.
 
-## Ресурсы
+## Resources
 
-ClickHouse ограничен 768 МБ памяти, системные журналы отключены, потоки хранятся `FLOWS_TTL_DAYS` дней.
-Для домашней сети это десятки мегабайт в сутки.
+ClickHouse is limited to 768 MB of memory, system logs are disabled, flows are kept for `FLOWS_TTL_DAYS` days.
+For a home network this is tens of megabytes per day.

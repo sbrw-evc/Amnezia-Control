@@ -1,7 +1,7 @@
-# Настройка MikroTik
+# MikroTik setup
 
-Файл `mikrotik/amnezia-control.rsc` настраивает policy routing и экспорт NetFlow. Отредактируйте переменные в начале
-(`gateway`, `tunnelProbe`, `lanIface`, `wanIface`, `flowPort`), загрузите файл на роутер и импортируйте:
+`mikrotik/amnezia-control.rsc` configures policy routing and NetFlow export. Edit the variables at the top
+(`gateway`, `tunnelProbe`, `lanIface`, `wanIface`, `flowPort`), upload the file to the router and import it:
 
 ```
 /export file=before-amnezia
@@ -9,39 +9,39 @@
 /import file-name=amnezia-control.rsc
 ```
 
-## Что создаётся
+## What gets created
 
-| Объект | Назначение |
+| Object | Purpose |
 |---|---|
-| Таблица `to-vpn` | Отдельная таблица маршрутизации для трафика к сайтам из списка |
-| Маршрут `10.8.1.0/32` → шлюз | Проверка туннеля: адрес сервера внутри туннеля доступен только через шлюз |
-| `0.0.0.0/0` → `10.8.1.0` в `to-vpn` | Рекурсивный маршрут с `check-gateway=ping` — активен, только пока туннель жив |
-| Резервный `0.0.0.0/0` → провайдер (distance 10) | При падении туннеля сайты идут напрямую, а не пропадают |
-| Скрипт DHCP-клиента WAN | Обновляет шлюз резервного маршрута при смене адреса провайдера |
-| Правило `routing-mark=to-vpn` | Поиск в таблице `to-vpn` |
-| Mangle (2 правила) | Помечает новые соединения к `vpn-sites` и направляет их в `to-vpn` |
-| NAT masquerade | Ответы из туннеля возвращаются через роутер (симметричный conntrack) |
-| Fasttrack `connection-mark=no-mark` | Помеченные соединения не уходят в fasttrack |
-| `send-redirects=no` | Роутер не отправляет ICMP redirect на шлюз |
-| Traffic Flow (NetFlow v9) | Экспорт потоков на коллектор, порт 2055/udp |
+| Table `to-vpn` | A separate routing table for traffic to listed sites |
+| Route `10.8.1.0/32` → gateway | Tunnel probe: the server's in-tunnel address is reachable only through the gateway |
+| `0.0.0.0/0` → `10.8.1.0` in `to-vpn` | Recursive route with `check-gateway=ping` — active only while the tunnel is alive |
+| Fallback `0.0.0.0/0` → ISP (distance 10) | If the tunnel is down, listed sites go directly instead of failing |
+| WAN DHCP client script | Updates the fallback route gateway when the ISP address changes |
+| Rule `routing-mark=to-vpn` | Lookup in the `to-vpn` table |
+| Mangle (2 rules) | Marks new connections to `vpn-sites` and routes them into `to-vpn` |
+| NAT masquerade | Replies from the tunnel come back through the router (symmetric conntrack) |
+| Fasttrack `connection-mark=no-mark` | Marked connections are not fasttracked |
+| `send-redirects=no` | The router does not send ICMP redirects towards the gateway |
+| Traffic Flow (NetFlow v9) | Flow export to the collector, port 2055/udp |
 
-Address-list `vpn-sites` заполняет панель (раздел «Маршрутизация»), применяя изменения диффом.
+The `vpn-sites` address list is filled by the panel ("Routing" section), which applies changes as a diff.
 
-## Как классифицируется трафик в потоках
+## How flows are classified
 
-- Источник в LAN → `Direction = out`; `Route = vpn`, если next-hop — шлюз.
-- Источник вне LAN → `Direction = in`; `Route = vpn`, если получатель — адрес роутера в LAN (masquerade), иначе `direct`.
-- Внутренний трафик LAN и транспорт туннеля к VPS исключаются.
+- Source in the LAN → `Direction = out`; `Route = vpn` if the next hop is the gateway.
+- Source outside the LAN → `Direction = in`; `Route = vpn` if the destination is the router's LAN address (masquerade), otherwise `direct`.
+- Traffic inside the LAN and the tunnel transport to the VPS are excluded.
 
-## Нагрузка
+## Load
 
-Fasttrack сохраняется для прямого трафика. Помеченные VPN-соединения проходят медленным путём.
-Traffic Flow добавляет нагрузку на CPU; на слабых коммутаторах (CRS3xx) следите за `cpu-load`.
+Fasttrack stays enabled for direct traffic. Marked VPN connections take the slow path.
+Traffic Flow adds CPU load; on weak switches (CRS3xx) keep an eye on `cpu-load`.
 
-## Откат
+## Rollback
 
 ```
 /import file-name=amnezia-control-remove.rsc
 ```
 
-или `/system backup load name=before-amnezia`.
+or `/system backup load name=before-amnezia`.

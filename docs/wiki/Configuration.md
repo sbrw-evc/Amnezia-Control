@@ -1,49 +1,49 @@
-# Конфигурация
+# Configuration
 
-## Переменные окружения (`.env`)
+## Environment variables (`.env`)
 
-| Переменная | По умолчанию | Описание |
+| Variable | Default | Description |
 |---|---|---|
-| `AWG_HOST` | — | IP или имя сервера Amnezia (VPS). Обязательна. |
-| `AWG_SSH_USER` | `root` | Пользователь SSH на VPS |
-| `AWG_CONTAINER` | `amnezia-awg2` | Docker-контейнер AmneziaWG на VPS |
-| `AWG_IFACE` | `awg0` | Интерфейс внутри контейнера |
-| `AWG_BIN` | `awg` | Утилита (`awg` или `wg`) |
-| `AWG_DIR` | `/opt/amnezia/awg` | Каталог конфигурации в контейнере |
-| `ROUTER_HOST` | `192.168.0.1` | Адрес MikroTik |
-| `ROUTER_SSH_USER` | `admin` | Пользователь SSH на MikroTik |
-| `GATEWAY_IP` | `192.168.0.210` | Адрес шлюза (хоста с Docker) в LAN |
-| `LAN_CIDR` | `192.168.0.0/24` | Локальная сеть (классификация потоков) |
-| `LAN_IF` | `eth0` | LAN-интерфейс хоста шлюза |
-| `TUNNEL_NET` | `10.8.1.0/24` | Сеть туннеля AmneziaWG |
-| `SSH_KEY_FILE` | `/root/.ssh/id_ed25519` | SSH-ключ, импортируемый в OpenBao при первом запуске |
-| `PUBLIC_BASE_URL` | `http://localhost:8080` | Адрес панели (ссылки для выдачи конфигов) |
-| `PANEL_PORT` | `8080` | Порт панели |
-| `FLOW_PORT` | `2055` | UDP-порт приёма NetFlow |
-| `INITIAL_ADMIN_USER` / `INITIAL_ADMIN_PASSWORD` | `admin` / — | Первый администратор (создаётся, если пользователей нет) |
-| `POSTGRES_PASSWORD` | — | Пароль PostgreSQL |
-| `CLICKHOUSE_PASSWORD` | — | Пароль ClickHouse |
-| `OPENBAO_VERSION` | `2.6.2` | Версия образа OpenBao |
-| `CLICKHOUSE_VERSION` | `24.8` | Версия образа ClickHouse |
-| `FLOWS_TTL_DAYS` | `30` | Срок хранения потоков |
-| `WEB_CONCURRENCY` | `2` | Количество процессов API |
-| `SESSION_TTL_HOURS` | `12` | Время жизни сессии |
-| `COOKIE_SECURE` | `false` | `true`, если панель за HTTPS |
+| `AWG_HOST` | — | IP or hostname of the Amnezia server (VPS). Required. |
+| `AWG_SSH_USER` | `root` | SSH user on the VPS |
+| `AWG_CONTAINER` | `amnezia-awg2` | AmneziaWG Docker container on the VPS |
+| `AWG_IFACE` | `awg0` | Interface inside the container |
+| `AWG_BIN` | `awg` | CLI tool (`awg` or `wg`) |
+| `AWG_DIR` | `/opt/amnezia/awg` | Config directory inside the container |
+| `ROUTER_HOST` | `192.168.0.1` | MikroTik address |
+| `ROUTER_SSH_USER` | `admin` | SSH user on MikroTik |
+| `GATEWAY_IP` | `192.168.0.210` | LAN address of the gateway (the Docker host) |
+| `LAN_CIDR` | `192.168.0.0/24` | Local network (used to classify flows) |
+| `LAN_IF` | `eth0` | LAN interface of the gateway host |
+| `TUNNEL_NET` | `10.8.1.0/24` | AmneziaWG tunnel network |
+| `SSH_KEY_FILE` | `/root/.ssh/id_ed25519` | SSH key imported into OpenBao on first start |
+| `PUBLIC_BASE_URL` | `http://localhost:8080` | Panel URL (used in config share links) |
+| `PANEL_PORT` | `8080` | Panel port |
+| `FLOW_PORT` | `2055` | UDP port for NetFlow |
+| `INITIAL_ADMIN_USER` / `INITIAL_ADMIN_PASSWORD` | `admin` / — | First administrator (created when there are no users); the password is valid only until the first login |
+| `POSTGRES_PASSWORD` | — | PostgreSQL password |
+| `CLICKHOUSE_PASSWORD` | — | ClickHouse password |
+| `OPENBAO_VERSION` | `2.6.2` | OpenBao image version |
+| `CLICKHOUSE_VERSION` | `24.8` | ClickHouse image version |
+| `FLOWS_TTL_DAYS` | `30` | Flow retention |
+| `WEB_CONCURRENCY` | `2` | Number of API processes |
+| `SESSION_TTL_HOURS` | `12` | Session lifetime |
+| `COOKIE_SECURE` | `false` | Set to `true` when the panel is served over HTTPS |
 
-## Настройки в панели (раздел «Настройки»)
+## In-panel settings ("Settings" page)
 
-| Группа | Параметр | Описание |
+| Group | Setting | Description |
 |---|---|---|
-| Конфиги клиентов | DNS для клиентов | Значение `DNS` в выдаваемых конфигах |
-| | Адрес сервера в конфигах | Если пусто — `AWG_HOST` |
-| | Срок жизни ссылки | Для одноразовых ссылок на конфиг |
-| Политики | Квота и срок по умолчанию | Подставляются в форму нового клиента |
-| | Порог предупреждения о квоте, дни до окончания доступа | Для алертов |
-| Мониторинг | Интервал опроса сервера | По умолчанию 10 с |
-| | Хранение статистики | По умолчанию 90 дней |
-| | Порог «шлюз молчит» | Минуты без handshake до алерта |
-| | Часовой пояс отчётов | Для тепловой карты и сообщений |
-| Уведомления | Включить, минимальная важность, Telegram chat id | См. [[Monitoring]] |
-| Резервное копирование | Ежедневная копия, количество хранимых копий | См. [[Backups]] |
+| Client configs | DNS for clients | `DNS` value in issued configs |
+| | Server address in configs | Empty — `AWG_HOST` |
+| | Share link lifetime | For one-time config links |
+| Defaults | Default quota and access period | Pre-filled in the new client form |
+| | Quota warning threshold, days before expiry | For alerts |
+| Monitoring | Server polling interval | 10 s by default |
+| | Statistics retention | 90 days by default |
+| | "Gateway silent" threshold | Minutes without a handshake before an alert |
+| | Report time zone | For the heatmap and messages |
+| Notifications | Enable, minimum severity, Telegram chat id | See [[Monitoring]] |
+| Backups | Daily backup, number of backups kept | See [[Backups]] |
 
-Настройки хранятся в PostgreSQL и применяются всеми процессами в течение 15 секунд.
+Settings are stored in PostgreSQL and picked up by all processes within 15 seconds.

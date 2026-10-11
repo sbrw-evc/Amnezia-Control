@@ -1,4 +1,4 @@
-# Диагностика
+# Troubleshooting
 
 ```bash
 cd /opt/amnezia-control
@@ -8,7 +8,7 @@ docker compose logs -f awg-client
 docker compose logs -f flow-collector
 ```
 
-## Туннель шлюза
+## Gateway tunnel
 
 ```bash
 docker exec ac-awg-client awg show awg0
@@ -17,12 +17,12 @@ curl --interface awg0 https://ifconfig.me
 ip rule; ip route show table 200
 ```
 
-- Нет handshake — проверьте, что параметры обфускации и ключи в `awg-client/config/awg0.conf` совпадают с сервером
-  (перевыпустите клиента шлюза в панели и замените файл).
-- Пинг через туннель есть, но LAN-трафик не проходит — проверьте `DOCKER-USER` (`iptables -S DOCKER-USER`)
-  и `net.ipv4.ip_forward=1`.
+- No handshake — make sure the obfuscation parameters and keys in `awg-client/config/awg0.conf` match the server
+  (reissue the gateway client in the panel and replace the file).
+- The tunnel answers pings but LAN traffic does not pass — check `DOCKER-USER` (`iptables -S DOCKER-USER`)
+  and `net.ipv4.ip_forward=1`.
 
-## Маршрутизация на MikroTik
+## Routing on MikroTik
 
 ```
 /ip route print where routing-table=to-vpn
@@ -30,21 +30,21 @@ ip rule; ip route show table 200
 /tool traceroute 142.250.74.46
 ```
 
-Если маршрут через туннель неактивен — роутер пингует `10.8.1.0` через шлюз; проверьте маршрут
-`10.8.1.0/32` и работу `awg-client`. При падении туннеля трафик идёт через резервный маршрут.
+If the tunnel route is inactive — the router pings `10.8.1.0` through the gateway; check the `10.8.1.0/32` route
+and that `awg-client` is running. While the tunnel is down, traffic uses the fallback route.
 
-## Потоки не появляются
+## No flows
 
-- `/ip traffic-flow print` — `enabled: yes`, есть target на `GATEWAY_IP:2055`.
-- `docker compose logs flow-collector` — строка `goflow2 listening`; раз в 5 минут — счётчики received/written.
-- Брандмауэр хоста шлюза должен пропускать UDP 2055.
+- `/ip traffic-flow print` — `enabled: yes`, a target pointing at `GATEWAY_IP:2055`.
+- `docker compose logs flow-collector` — the `goflow2 listening` line; received/written counters every 5 minutes.
+- The gateway host firewall must allow UDP 2055.
 
-## Вход в панель
+## Signing in
 
-- «Неверный логин или пароль» — проверьте раскладку (кнопка с глазом показывает введённый пароль); после 5 ошибок учётная запись блокируется на 10 минут.
-- `INITIAL_ADMIN_PASSWORD` из `.env` действует только до первого входа: панель сразу требует задать собственный пароль, после этого работает только он.
-- Забыт пароль — `docker compose exec backend python -m app.cli reset-password admin`.
-- Старый интерфейс после обновления — `Ctrl+F5` (HTML не кэшируется, ресурсы версионированы).
+- "Invalid login or password" — check the keyboard layout (the eye button reveals the typed password); after 5 failures the account is locked for 10 minutes.
+- `INITIAL_ADMIN_PASSWORD` from `.env` is valid only until the first sign-in: the panel immediately asks you to set your own password, and only that password works afterwards.
+- Forgotten password — `docker compose exec backend python -m app.cli reset-password admin`.
+- Old UI after an update — `Ctrl+F5` (HTML is not cached, assets are versioned).
 
 ## OpenBao
 
@@ -53,9 +53,9 @@ docker exec ac-openbao bao status -address=http://127.0.0.1:8200
 docker compose logs bao-init
 ```
 
-`Sealed: true` после перезапуска — проверьте наличие и права `openbao/keys/unseal.key` (владелец — пользователь openbao).
+`Sealed: true` after a restart — check that `openbao/keys/unseal.key` exists and has the right permissions (owned by the openbao user).
 
-## Карта без подложки
+## Map without tiles
 
-Тайлы идут через `/tiles/…` панели. Проверьте `curl -I http://<panel>/tiles/3/4/2.png` — ожидается 200 и заголовок
-`X-Tile-Cache`. Серверу нужен доступ к `tile.openstreetmap.org`.
+Tiles are served through the panel's `/tiles/…`. Check `curl -I http://<panel>/tiles/3/4/2.png` — expect 200 and an
+`X-Tile-Cache` header. The server needs access to `tile.openstreetmap.org`.

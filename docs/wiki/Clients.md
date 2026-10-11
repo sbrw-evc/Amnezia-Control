@@ -1,52 +1,52 @@
-# Клиенты VPN
+# VPN clients
 
-## Жизненный цикл
+## Lifecycle
 
 ```
-создан ──► активен ⇄ заблокирован (вручную / срок истёк / квота)
+created ──► active ⇄ blocked (manually / expired / quota)
               │
-              └──► удалён        «удалён на сервере» — пир исчез из awg0.conf вне панели
+              └──► deleted        "removed on server" — the peer disappeared from awg0.conf outside the panel
 ```
 
-| Действие | Что происходит на сервере |
+| Action | What happens on the server |
 |---|---|
-| Создание | Генерируется пара ключей X25519, выделяется свободный адрес, пир добавляется в `awg0.conf` и применяется через `awg syncconf`, запись добавляется в `clientsTable` (видна в приложении Amnezia). Приватный ключ сохраняется в OpenBao. |
-| Блокировка | Блок пира комментируется префиксом `#DISABLED#` и снимается с интерфейса. Ключ и адрес сохраняются. |
-| Разблокировка | Блок раскомментируется и применяется. |
-| Перевыпуск ключей | Новая пара ключей с тем же адресом и историей. Старый конфиг перестаёт работать. |
-| Удаление | Пир удаляется из конфига и `clientsTable`, ключ — из OpenBao, история — из БД. |
+| Create | An X25519 key pair is generated, a free address is allocated, the peer is added to `awg0.conf` and applied via `awg syncconf`, and an entry is added to `clientsTable` (visible in the Amnezia app). The private key is stored in OpenBao. |
+| Block | The peer block is commented out with the `#DISABLED#` prefix and removed from the interface. Key and address are kept. |
+| Unblock | The block is uncommented and applied. |
+| Reissue keys | A new key pair with the same address and history. The old config stops working. |
+| Delete | The peer is removed from the config and `clientsTable`, the key from OpenBao, the history from the database. |
 
-Системный клиент шлюза (`home-gateway`) нельзя заблокировать или удалить из панели.
+The gateway's system client (`home-gateway`) cannot be blocked or deleted from the panel.
 
-## Срок доступа и квота
+## Access period and quota
 
-- **Срок доступа** — при наступлении даты клиент блокируется (`expired`). Продление (в карточке есть кнопка «+30 дней») разблокирует его автоматически.
-- **Месячная квота** — суммарный трафик с 1-го числа. При превышении — блокировка (`quota`), с началом месяца или при увеличении квоты — автоматическая разблокировка.
-- **Предупреждения** — алерты при достижении порога квоты и за N дней до окончания срока.
+- **Access period** — when the date is reached, the client is blocked (`expired`). Extending it (the client page has a "+30 days" button) unblocks the client automatically.
+- **Monthly quota** — total traffic since the 1st of the month. When exceeded, the client is blocked (`quota`); it is unblocked automatically when the month changes or the quota is raised.
+- **Warnings** — alerts when the quota threshold is reached and N days before expiry.
 
-Проверка выполняется каждую минуту.
+Checks run every minute.
 
-## Выдача доступа
+## Handing out access
 
-В окне «Конфиг»:
+In the "Config" dialog:
 
-- **QR** — для AmneziaWG на телефоне;
-- **`.conf`** — файл для AmneziaWG на компьютере;
-- **`vpn://`** — ключ для приложения Amnezia VPN;
-- **Ссылка на 24 ч** — одноразовая публичная ссылка `/s/<token>` (3 открытия), можно отправить человеку без доступа к панели.
+- **QR** — for AmneziaWG on a phone;
+- **`.conf`** — a file for AmneziaWG on a computer;
+- **`vpn://`** — a key for the Amnezia VPN app;
+- **24 h link** — a one-time public link `/s/<token>` (3 opens) that can be sent to someone without panel access.
 
-Каждая выдача конфига записывается в журнал аудита. Конфиг можно получить только для клиентов, ключ которых хранится в
-панели. Для клиентов, созданных в приложении Amnezia, используйте «Перевыпустить».
+Every config disclosure is written to the audit log. A config can be obtained only for clients whose key is stored
+in the panel. For clients created in the Amnezia app, use "Reissue".
 
-## Синхронизация
+## Synchronization
 
-Каждые 5 минут и по кнопке «Синхронизировать» панель сверяет `awg0.conf`:
+Every 5 minutes and on the "Synchronize" button the panel reconciles `awg0.conf`:
 
-- пиры, созданные вне панели, импортируются (имя берётся из `clientsTable`);
-- изменения блокировки, сделанные вручную, отражаются в статусе;
-- пропавшие пиры помечаются «удалён на сервере».
+- peers created outside the panel are imported (the name is taken from `clientsTable`);
+- blocking changes made by hand are reflected in the status;
+- missing peers are marked "removed on server".
 
-## Список
+## Client list
 
-Фильтры: онлайн, активные, заблокированные, удалённые на сервере, без ключа; теги; поиск по имени, владельцу, адресу,
-городу, ключу. Сортировка по скорости, трафику, handshake. Массовые блокировка, разблокировка и удаление. Экспорт CSV.
+Filters: online, active, blocked, removed on server, no key in panel; tags; search by name, owner, address,
+city, key. Sorting by throughput, traffic, handshake. Bulk block, unblock and delete. CSV export.

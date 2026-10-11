@@ -1,8 +1,8 @@
-# Маршрутизация
+# Routing
 
-## Список сайтов
+## Site list
 
-Формат `ip-list.json` — объект «сайт → описание»:
+`ip-list.json` format — an object mapping a site to its description:
 
 ```json
 {
@@ -16,28 +16,28 @@
 }
 ```
 
-При загрузке (**Маршрутизация → Загрузить ip-list.json**, только администратор):
+On upload (**Routing → Upload ip-list.json**, administrators only):
 
-1. Берутся `ip4` и `cidr4`; широкие подсети заменяются по карте `replace`.
-2. Отбрасываются IPv6, частные и служебные диапазоны, префиксы шире /8 и адрес VPS.
-3. Подсети объединяются в минимальный набор.
-4. Address-list `vpn-sites` на MikroTik обновляется **диффом** (удаляются лишние, добавляются новые), без разрыва маршрутизации.
-5. Разбиение «подсеть → сайт → группа» загружается в словарь ClickHouse для анализа потоков.
+1. `ip4` and `cidr4` are taken; broad prefixes are replaced according to the `replace` map.
+2. IPv6, private and reserved ranges, prefixes wider than /8 and the VPS address are dropped.
+3. Prefixes are collapsed into a minimal set.
+4. The `vpn-sites` address list on MikroTik is updated **as a diff** (stale entries removed, new ones added), without interrupting routing.
+5. The "prefix → site → group" mapping is loaded into the ClickHouse dictionary for flow analytics.
 
-На странице видны количество сайтов и подсетей, доля адресного пространства IPv4, группы сайтов.
+The page shows the number of sites and prefixes, the share of the IPv4 address space and the site groups.
 
-## Свои адреса через VPN
+## Custom addresses through the VPN
 
-Публичные IPv4-адреса или подсети, которые нужно отправлять через VPN дополнительно к списку. Хранятся в панели,
-добавляются на роутер сразу и сохраняются при последующих загрузках списка.
+Public IPv4 addresses or prefixes that should go through the VPN in addition to the list. They are stored in the panel,
+added to the router immediately and kept across subsequent list uploads.
 
-## Куда пойдёт трафик
+## Where will the traffic go
 
-Проверка домена или IP: домен разрешается через DNS-over-HTTPS (Cloudflare, Google) — это обходит подмену ответов
-у провайдера; затем каждый адрес сверяется с текущим `vpn-sites` на роутере. Показывается подсеть, по которой адрес
-попадёт в VPN. У CDN адреса могут отличаться от тех, что получат ваши устройства.
+Check a domain or IP: the domain is resolved over DNS-over-HTTPS (Cloudflare, Google), which bypasses ISP DNS
+tampering; each address is then matched against the current `vpn-sites` on the router. The prefix that sends the
+address into the VPN is shown. For CDNs the addresses may differ from what your devices receive.
 
-## Состояние
+## Status
 
-Схема LAN → MikroTik → шлюз → сервер, активность маршрута через туннель, резервный маршрут, счётчики правил mangle,
-CPU и uptime роутера. При неактивном туннеле создаётся критичный алерт.
+LAN → MikroTik → gateway → server diagram, whether the tunnel route is active, the fallback route, mangle rule counters,
+router CPU and uptime. When the tunnel is inactive, a critical alert is raised.

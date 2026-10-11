@@ -1,53 +1,54 @@
-# Безопасность
+# Security
 
-## Роли
+## Roles
 
-| Роль | Права |
+| Role | Permissions |
 |---|---|
-| Администратор | Всё: сервер, маршрутизация, операторы, токены, аудит, резервные копии, настройки |
-| Оператор | Клиенты VPN: создание, изменение, блокировка, выдача конфигов, перевыпуск, удаление |
-| Наблюдатель | Только просмотр мониторинга, аналитики, потоков |
+| Administrator | Everything: server, routing, operators, tokens, audit, backups, settings |
+| Operator | VPN clients: create, edit, block, hand out configs, reissue, delete |
+| Viewer | Read-only access to monitoring, analytics and flows |
 
-Защиты от потери доступа: нельзя удалить или понизить последнего администратора, изменить свою роль или отключить себя.
+Lockout protection: the last administrator cannot be deleted or demoted, and users cannot change their own role or disable themselves.
 
-## Аутентификация
+## Authentication
 
-- Пароли — argon2id; минимум 10 символов и два класса символов.
-- Блокировка учётной записи на 10 минут после 5 неудачных попыток; ограничение попыток входа по IP.
-- Сессии — случайный токен в httpOnly cookie `SameSite=Strict`; в БД хранится только SHA-256. Список сессий и отзыв — в профиле.
-- Смена пароля завершает остальные сессии. Новые операторы и сброшенные пароли требуют смены при входе.
-- 2FA (TOTP) — секрет хранится в OpenBao; администратор может отключить 2FA пользователю.
-- CSRF — изменяющие запросы требуют заголовок `X-Requested-With: amnezia-control`.
+- Passwords are hashed with argon2id; at least 10 characters and two character classes.
+- An account is locked for 10 minutes after 5 failed attempts; sign-in attempts are rate-limited per IP.
+- Sessions are random tokens in an httpOnly `SameSite=Strict` cookie; only the SHA-256 is stored in the database. Sessions can be listed and revoked in the profile.
+- Changing the password ends all other sessions. New operators and reset passwords must be changed at sign-in.
+- 2FA (TOTP) — the secret is stored in OpenBao; an administrator can disable 2FA for a user.
+- CSRF — state-changing requests require the `X-Requested-With: amnezia-control` header.
+- Password fields have a show/hide button.
 
-## API-токены
+## API tokens
 
-Выпускаются администратором (раздел «Доступ к панели»), с ролью и сроком действия. Формат `ac_…`, показывается один раз,
-хранится только хеш. Используются как `Authorization: Bearer ac_…`; не дают доступа к профилю и сессиям.
+Issued by administrators ("Panel access" page) with a role and an expiry. Format `ac_…`, shown once,
+only the hash is stored. Used as `Authorization: Bearer ac_…`; they do not grant access to the profile or sessions.
 
-## Секреты
+## Secrets
 
-| Секрет | Где хранится |
+| Secret | Where it is stored |
 |---|---|
-| Приватные ключи клиентов | OpenBao `amnezia/clients/<id>` |
-| SSH-ключ к VPS и MikroTik | OpenBao `amnezia/infra/ssh` (на диск backend пишется только во временный tmpfs) |
-| TOTP-секреты | OpenBao `amnezia/users/<id>/totp` |
-| Токен Telegram-бота | OpenBao `amnezia/notify/telegram` |
-| Пароли БД, ClickHouse, первого администратора | `.env` (права 600) |
+| Client private keys | OpenBao `amnezia/clients/<id>` |
+| SSH key for the VPS and MikroTik | OpenBao `amnezia/infra/ssh` (the backend writes it only to a temporary tmpfs) |
+| TOTP secrets | OpenBao `amnezia/users/<id>/totp` |
+| Telegram bot token | OpenBao `amnezia/notify/telegram` |
+| Database, ClickHouse and first administrator passwords | `.env` (mode 600) |
 
-Backend аутентифицируется в OpenBao по AppRole с политикой, ограниченной `amnezia/*` и чтением raft-снапшота.
-OpenBao, PostgreSQL и ClickHouse не публикуют портов наружу.
+The backend authenticates to OpenBao with an AppRole whose policy is limited to `amnezia/*` and reading the raft snapshot.
+OpenBao, PostgreSQL and ClickHouse do not publish any ports.
 
-**Static auto-unseal**: OpenBao распечатывается автоматически ключом `openbao/keys/unseal.key`. Это удобно для
-автономной работы, но ключ лежит на том же хосте: защищайте хост и храните копию ключа отдельно.
+**Static auto-unseal**: OpenBao is unsealed automatically with `openbao/keys/unseal.key`. This is convenient for
+unattended operation, but the key lives on the same host: protect the host and keep a copy of the key elsewhere.
 
-## Аудит
+## Audit
 
-Журнал фиксирует входы и неудачные попытки, все операции с клиентами (включая каждую выдачу конфига и открытие ссылки),
-изменения конфига сервера, списка сайтов, своих подсетей, настроек, операторов, токенов, резервные копии.
-Фильтры по типу действия и поиск; события появляются в реальном времени.
+The log records sign-ins and failed attempts, every client operation (including each config disclosure and share-link open),
+changes to the server config, site list, custom prefixes, settings, operators, tokens, and backups.
+Filters by action type and search; entries appear in real time.
 
-## Рекомендации
+## Recommendations
 
-- Публикуйте панель только в LAN или через VPN; при доступе извне — reverse proxy с HTTPS и `COOKIE_SECURE=true`.
-- Включите 2FA для администраторов.
-- Используйте отдельные SSH-ключи и ограниченного пользователя на MikroTik.
+- Expose the panel only on the LAN or through a VPN; for external access use a reverse proxy with HTTPS and `COOKIE_SECURE=true`.
+- Enable 2FA for administrators.
+- Use dedicated SSH keys and a restricted user on MikroTik.

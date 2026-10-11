@@ -1,42 +1,42 @@
 # API
 
-Интерактивная документация OpenAPI: `/api/docs` (схема — `/api/openapi.json`).
+Interactive OpenAPI documentation: `/api/docs` (schema — `/api/openapi.json`).
 
-## Авторизация
+## Authentication
 
-- **Браузер** — cookie сессии + заголовок `X-Requested-With: amnezia-control` для изменяющих запросов.
-- **Интеграции** — API-токен: `Authorization: Bearer ac_…` (роль задаётся при выпуске).
+- **Browser** — session cookie + the `X-Requested-With: amnezia-control` header for state-changing requests.
+- **Integrations** — an API token: `Authorization: Bearer ac_…` (the role is set when the token is issued).
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" http://<panel>/api/analytics/summary
 ```
 
-## Основные эндпоинты
+## Main endpoints
 
-| Метод | Путь | Роль | Описание |
+| Method | Path | Role | Description |
 |---|---|---|---|
-| GET | `/api/clients` | наблюдатель | Список клиентов (`q`, `status`, `tag`) |
-| POST | `/api/clients` | оператор | Создать клиента |
-| GET/PATCH/DELETE | `/api/clients/{id}` | наблюдатель / оператор | Карточка, изменение, удаление |
-| POST | `/api/clients/{id}/block` · `/unblock` · `/reissue` | оператор | Блокировка, разблокировка, перевыпуск |
-| GET | `/api/clients/{id}/config` · `/config.conf` | оператор | Конфиг (QR, `.conf`, `vpn://`) |
-| POST | `/api/clients/{id}/share` | оператор | Одноразовая ссылка |
-| POST | `/api/clients/bulk` · `/sync` | оператор | Массовые действия, синхронизация |
-| GET | `/api/analytics/summary` · `/live` · `/traffic` · `/top` · `/heatmap` · `/geo` | наблюдатель | Аналитика |
-| GET | `/api/flows/status` · `/overview` · `/fields` | наблюдатель | Потоки: статус и обзор |
-| POST | `/api/flows/visualize` · `/recent` | наблюдатель | Визуализация и последние потоки |
-| GET/POST/DELETE | `/api/flows/filters` | наблюдатель | Сохранённые фильтры |
-| GET | `/api/routing/status` · `/custom` | наблюдатель | Маршрутизация |
-| POST | `/api/routing/check` | наблюдатель | Куда пойдёт трафик |
-| POST | `/api/routing/site-list` · `/custom` | администратор | Загрузка списка, свои подсети |
-| GET/PUT | `/api/server/config` | администратор | Конфиг сервера AWG |
-| GET/POST/DELETE | `/api/backups` | администратор | Резервные копии |
-| GET/POST/DELETE | `/api/tokens` | администратор | API-токены |
-| GET/PUT | `/api/settings` | наблюдатель / администратор | Настройки |
-| GET | `/api/alerts` · `/api/audit` | наблюдатель / администратор | Алерты, аудит |
-| GET | `/api/events` | наблюдатель | Server-Sent Events |
+| GET | `/api/clients` | viewer | Client list (`q`, `status`, `tag`) |
+| POST | `/api/clients` | operator | Create a client |
+| GET/PATCH/DELETE | `/api/clients/{id}` | viewer / operator | Details, update, delete |
+| POST | `/api/clients/{id}/block` · `/unblock` · `/reissue` | operator | Block, unblock, reissue |
+| GET | `/api/clients/{id}/config` · `/config.conf` | operator | Config (QR, `.conf`, `vpn://`) |
+| POST | `/api/clients/{id}/share` | operator | One-time link |
+| POST | `/api/clients/bulk` · `/sync` | operator | Bulk actions, synchronization |
+| GET | `/api/analytics/summary` · `/live` · `/traffic` · `/top` · `/heatmap` · `/geo` | viewer | Analytics |
+| GET | `/api/flows/status` · `/overview` · `/fields` | viewer | Flows: status and overview |
+| POST | `/api/flows/visualize` · `/recent` | viewer | Visualization and recent flows |
+| GET/POST/DELETE | `/api/flows/filters` | viewer | Saved filters |
+| GET | `/api/routing/status` · `/custom` | viewer | Routing |
+| POST | `/api/routing/check` | viewer | Where will the traffic go |
+| POST | `/api/routing/site-list` · `/custom` | administrator | Site list upload, custom prefixes |
+| GET/PUT | `/api/server/config` | administrator | AWG server config |
+| GET/POST/DELETE | `/api/backups` | administrator | Backups |
+| GET/POST/DELETE | `/api/tokens` | administrator | API tokens |
+| GET/PUT | `/api/settings` | viewer / administrator | Settings |
+| GET | `/api/alerts` · `/api/audit` | viewer / administrator | Alerts, audit |
+| GET | `/api/events` | viewer | Server-Sent Events |
 
-### Пример: визуализация потоков
+### Example: flow visualization
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -44,19 +44,19 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
   -d '{"dimensions":["Site","Route"],"limit":10,"graph":"stacked","unit":"bps","filter":"Direction = out"}'
 ```
 
-## События (SSE)
+## Events (SSE)
 
-`GET /api/events` — поток `text/event-stream`:
+`GET /api/events` — a `text/event-stream`:
 
-| Событие | Данные |
+| Event | Data |
 |---|---|
-| `live` | `t`, `rx`, `tx` (байт/с), `online`, `clients` — скорости по клиентам |
-| `clients` | Изменение клиента (`id`) или синхронизация |
-| `alert` | Новый или решённый алерт |
-| `audit` | Новая запись аудита |
-| `connection` | Новое подключение клиента (город, страна) |
+| `live` | `t`, `rx`, `tx` (bytes/s), `online`, `clients` — per-client rates |
+| `clients` | A client changed (`id`) or a synchronization happened |
+| `alert` | A new or resolved alert |
+| `audit` | A new audit entry |
+| `connection` | A new client connection (city, country) |
 
-## Ошибки
+## Errors
 
-Ответ ошибки: `{"detail": "текст"}`. Коды: 400 — неверные данные, 401 — нужен вход, 403 — нет прав или CSRF,
-404 — не найдено, 409 — конфликт, 422 — валидация, 502 — недоступен VPS, MikroTik, OpenBao или ClickHouse.
+Error response: `{"detail": "text"}`. Codes: 400 — invalid data, 401 — sign-in required, 403 — no permission or CSRF,
+404 — not found, 409 — conflict, 422 — validation, 502 — the VPS, MikroTik, OpenBao or ClickHouse is unavailable.

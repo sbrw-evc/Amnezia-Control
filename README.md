@@ -1,85 +1,87 @@
 # Amnezia Control
 
-Панель управления self-hosted сервером **AmneziaWG** и выборочной маршрутизацией домашней сети через VPN:
-сайты из списка открываются через туннель, всё остальное — напрямую через провайдера.
-Включает учёт трафика, карту подключений, анализ сетевых потоков в духе Akvorado (NetFlow → ClickHouse),
-алерты в Telegram, резервное копирование и хранение секретов в OpenBao.
+**English** · [Русский](README.ru.md)
+
+A control panel for a self-hosted **AmneziaWG** server and selective routing of a home network through the VPN:
+sites from a list go through the tunnel, everything else goes directly through your ISP.
+It includes traffic accounting, a connection map, Akvorado-style network flow analytics (NetFlow → ClickHouse),
+Telegram alerts, backups and secret storage in OpenBao.
 
 ![stack](https://img.shields.io/badge/backend-FastAPI-009688) ![stack](https://img.shields.io/badge/frontend-React%20%2B%20Vite-61dafb)
 ![stack](https://img.shields.io/badge/db-PostgreSQL%2016-336791) ![stack](https://img.shields.io/badge/flows-ClickHouse-ffcc01)
 ![stack](https://img.shields.io/badge/secrets-OpenBao-5c4ee5) ![stack](https://img.shields.io/badge/VPN-AmneziaWG%203.x-orange)
 
-## Возможности
+## Features
 
-- **Клиенты VPN** — создание, срок доступа, месячная квота, теги, владелец; блокировка вручную и автоматически
-  (срок, квота), перевыпуск ключей, массовые действия, экспорт CSV.
-- **Выдача конфигов** — QR и `.conf` для AmneziaWG, ключ `vpn://` для Amnezia VPN, одноразовая ссылка с ограничением по времени.
-- **Мониторинг** — live-скорость (SSE), трафик по периодам, топ клиентов, тепловая карта активности, страны.
-- **Карта подключений** — OpenStreetMap (собственный кэширующий прокси тайлов), геолокация DB-IP Lite.
-- **Анализ потоков** — NetFlow v9 с MikroTik в ClickHouse; обзор, визуализация (stacked / 100% / lines / grid / sankey),
-  измерения, топ по среднему/пикам/последним, двунаправленный режим, сравнение с прошлым периодом,
-  язык фильтров, сохранённые фильтры, состояние в URL.
-- **Маршрутизация** — статус туннеля на MikroTik, загрузка списка сайтов (`ip-list.json`), свои подсети,
-  проверка «куда пойдёт трафик», автоматический переход на провайдера при падении туннеля.
-- **Сервер AWG** — параметры обфускации, редактор `awg0.conf` с резервными копиями и применением без разрыва соединений.
-- **Безопасность** — роли (администратор / оператор / наблюдатель), argon2, 2FA (TOTP), сессии с отзывом,
-  API-токены, журнал аудита, секреты только в OpenBao.
-- **Уведомления** — всплывающие уведомления (до 5 одновременно) для всех событий приложения и центр уведомлений с историей.
-- **Эксплуатация** — алерты (VPS, шлюз, туннель, OpenBao, квоты, сроки) с уведомлениями в Telegram,
-  ежедневные резервные копии (PostgreSQL + снапшот OpenBao), несколько процессов API с выбором лидера.
+- **VPN clients** — create clients with an access period, monthly quota, tags and owner; block manually or automatically
+  (expiry, quota); reissue keys; bulk actions; CSV export.
+- **Config delivery** — QR code and `.conf` for AmneziaWG, a `vpn://` key for Amnezia VPN, one-time links with an expiry.
+- **Monitoring** — live throughput (SSE), traffic per period, top clients, activity heatmap, countries.
+- **Connection map** — OpenStreetMap (served through the panel's own caching tile proxy), DB-IP Lite geolocation.
+- **Flow analytics** — NetFlow v9 from MikroTik into ClickHouse; overview, visualization (stacked / 100% / lines / grid / sankey),
+  dimensions, top by average / peak / last, bidirectional mode, previous-period comparison, a filter language,
+  saved filters, state in the URL.
+- **Routing** — tunnel status on MikroTik, site list upload (`ip-list.json`), custom prefixes,
+  "where will this traffic go" check, automatic fallback to the ISP when the tunnel is down.
+- **AWG server** — obfuscation parameters, an `awg0.conf` editor with backups that applies changes without dropping connections.
+- **Security** — roles (administrator / operator / viewer), argon2, 2FA (TOTP), revocable sessions,
+  API tokens, audit log, secrets kept only in OpenBao.
+- **Notifications** — toast notifications (up to 5 at once) for every event in the app and a notification center with history.
+- **Operations** — alerts (VPS, gateway, tunnel, OpenBao, quotas, expiry) with Telegram notifications,
+  daily backups (PostgreSQL + OpenBao snapshot), several API processes with leader election.
 
-## Архитектура
+## Architecture
 
 ```
- LAN ──► MikroTik ──(dst ∈ vpn-sites)──► шлюз (Docker-хост) ──awg0──► сервер Amnezia (VPS)
-            │  └─(остальное)──► провайдер
+ LAN ──► MikroTik ──(dst ∈ vpn-sites)──► gateway (Docker host) ──awg0──► Amnezia server (VPS)
+            │  └─(everything else)──► ISP
             └─ NetFlow v9 ──► flow-collector ──► ClickHouse
                                                      ▲
- браузер ──► frontend (nginx) ──► backend (FastAPI ×N) ──► PostgreSQL · OpenBao · SSH (VPS, MikroTik)
+ browser ──► frontend (nginx) ──► backend (FastAPI ×N) ──► PostgreSQL · OpenBao · SSH (VPS, MikroTik)
 ```
 
-| Сервис | Назначение |
+| Service | Purpose |
 |---|---|
-| `awg-client` | AmneziaWG-клиент шлюза: policy routing LAN → `awg0`, NAT, MSS clamp |
-| `backend` | REST API, SSE, фоновые задачи (опрос, политики, здоровье, бэкапы) |
-| `frontend` | SPA + прокси API и тайлов OpenStreetMap |
-| `postgres` | клиенты, статистика, аудит, алерты, пользователи |
-| `openbao` / `bao-init` | секреты (ключи клиентов, SSH-ключ, TOTP, токен Telegram), auto-unseal |
-| `clickhouse` | сетевые потоки, словарь сайтов (`ip_trie`) |
-| `flow-collector` | goflow2 + обогащение (страна, ASN, направление, маршрут) |
+| `awg-client` | The gateway's AmneziaWG client: policy routing LAN → `awg0`, NAT, MSS clamp |
+| `backend` | REST API, SSE, background jobs (polling, policies, health checks, backups) |
+| `frontend` | SPA + API proxy + OpenStreetMap tile proxy |
+| `postgres` | Clients, statistics, audit, alerts, users |
+| `openbao` / `bao-init` | Secrets (client keys, SSH key, TOTP, Telegram token), auto-unseal |
+| `clickhouse` | Network flows, site dictionary (`ip_trie`) |
+| `flow-collector` | goflow2 + enrichment (country, ASN, direction, route) |
 
-Подробности — в [Wiki](https://github.com/sbrw-evc/Amnezia-Control/wiki).
+See the [Wiki](https://github.com/sbrw-evc/Amnezia-Control/wiki) for details.
 
-## Быстрый старт
+## Quick start
 
-Требования: Docker 24+ с Compose v2, доступ по SSH-ключу к VPS с Amnezia и к MikroTik (RouterOS 7).
+Requirements: Docker 24+ with Compose v2, SSH key access to the Amnezia VPS and to MikroTik (RouterOS 7).
 
 ```bash
 git clone https://github.com/sbrw-evc/Amnezia-Control.git /opt/amnezia-control
 cd /opt/amnezia-control
-./install.sh              # создаст .env с паролями
+./install.sh              # creates .env with random passwords
 nano .env                 # AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_BASE_URL
-./install.sh              # поднимет стек
+./install.sh              # starts the stack
 ```
 
-Панель: `http://<GATEWAY_IP>:8080`, логин `admin`, пароль — `INITIAL_ADMIN_PASSWORD` из `.env`
-(при первом входе потребуется сменить). Затем:
+Panel: `http://<GATEWAY_IP>:8080`, login `admin`, password — `INITIAL_ADMIN_PASSWORD` from `.env`
+(you will be asked to change it on first login). Then:
 
-1. Создайте в панели клиента для шлюза, сохраните его конфиг в `awg-client/config/awg0.conf`, перезапустите `awg-client`.
-2. Импортируйте на MikroTik `mikrotik/amnezia-control.rsc` (адреса в начале файла).
-3. Загрузите список сайтов в разделе «Маршрутизация».
+1. Create a client for the gateway in the panel, save its config as `awg-client/config/awg0.conf`, restart `awg-client`.
+2. Import `mikrotik/amnezia-control.rsc` on MikroTik (addresses are at the top of the file).
+3. Upload the site list in the "Routing" section.
 
-Пошагово — [Установка](https://github.com/sbrw-evc/Amnezia-Control/wiki/Installation).
+Step by step — [Installation](https://github.com/sbrw-evc/Amnezia-Control/wiki/Installation).
 
-## Разработка
+## Development
 
 ```bash
 cd frontend && npm install && VITE_API_TARGET=http://<host>:8080 npm run dev
 ```
 
-Структура, принципы и API — в [Wiki → Разработка](https://github.com/sbrw-evc/Amnezia-Control/wiki/Development).
-Интерактивная документация API доступна на `/api/docs`.
+Structure, principles and API — see [Wiki → Development](https://github.com/sbrw-evc/Amnezia-Control/wiki/Development).
+Interactive API documentation is available at `/api/docs`.
 
-## Лицензия
+## License
 
 MIT

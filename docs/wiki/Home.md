@@ -1,40 +1,42 @@
 # Amnezia Control
 
-**Amnezia Control** — панель управления self-hosted VPN на базе AmneziaWG и выборочной маршрутизации домашней сети:
-сайты из списка идут через туннель, остальной трафик — напрямую через провайдера.
+**English** · [[Русский|ru-Home]]
 
-## Содержание
+**Amnezia Control** is a control panel for a self-hosted AmneziaWG VPN and selective routing of a home network:
+sites from a list go through the tunnel, the rest of the traffic goes directly through the ISP.
 
-| Раздел | О чём |
+## Contents
+
+| Page | About |
 |---|---|
-| [[Architecture]] | Компоненты, потоки данных, многопроцессность, хранение данных |
-| [[Installation]] | Установка шлюза, панели и первичная настройка |
-| [[MikroTik]] | Policy routing, резервный маршрут, NetFlow, откат |
-| [[Configuration]] | Переменные `.env` и настройки в панели |
-| [[Clients]] | Жизненный цикл клиентов VPN, квоты, сроки, выдача конфигов |
-| [[Monitoring]] | Дашборд, аналитика, карта, алерты, Telegram |
-| [[Flows]] | Анализ потоков: ClickHouse, измерения, язык фильтров, примеры |
-| [[Routing]] | Список сайтов, свои подсети, проверка маршрута |
-| [[Security]] | Роли, 2FA, сессии, API-токены, OpenBao, аудит |
-| [[Backups]] | Резервное копирование и восстановление |
-| [[API]] | REST API, авторизация токеном, SSE |
-| [[Troubleshooting]] | Диагностика и частые проблемы |
-| [[Development]] | Структура кода, принципы, локальный запуск |
+| [[Architecture]] | Components, data flow, multi-process mode, data storage |
+| [[Installation]] | Installing the gateway and the panel, initial setup |
+| [[MikroTik]] | Policy routing, fallback route, NetFlow, rollback |
+| [[Configuration]] | `.env` variables and in-panel settings |
+| [[Clients]] | VPN client lifecycle, quotas, expiry, config delivery |
+| [[Monitoring]] | Dashboard, analytics, map, alerts, notifications, Telegram |
+| [[Flows]] | Flow analytics: ClickHouse, dimensions, filter language, examples |
+| [[Routing]] | Site list, custom prefixes, route check |
+| [[Security]] | Roles, 2FA, sessions, API tokens, OpenBao, audit |
+| [[Backups]] | Backup and restore |
+| [[API]] | REST API, token authentication, SSE |
+| [[Troubleshooting]] | Diagnostics and common issues |
+| [[Development]] | Code structure, principles, local run |
 
-## Схема
+## Overview
 
 ```
- устройства LAN ──► MikroTik ──(dst ∈ vpn-sites)──► шлюз (LXC/VM с Docker) ──awg0──► сервер Amnezia (VPS)
-                       │  └──(остальное)──► провайдер
-                       └── NetFlow v9 ──► flow-collector ──► ClickHouse
- браузер ──► Amnezia Control (nginx → FastAPI) ──► PostgreSQL · OpenBao · ClickHouse · SSH к VPS и MikroTik
+ LAN devices ──► MikroTik ──(dst ∈ vpn-sites)──► gateway (LXC/VM with Docker) ──awg0──► Amnezia server (VPS)
+                    │  └──(everything else)──► ISP
+                    └── NetFlow v9 ──► flow-collector ──► ClickHouse
+ browser ──► Amnezia Control (nginx → FastAPI) ──► PostgreSQL · OpenBao · ClickHouse · SSH to VPS and MikroTik
 ```
 
-## Основные возможности
+## Key features
 
-- Управление клиентами AmneziaWG: создание, блокировка, сроки, квоты, перевыпуск ключей, массовые операции.
-- QR / `.conf` / `vpn://` и одноразовые ссылки для выдачи доступа.
-- Live-мониторинг, аналитика трафика, карта подключений на OpenStreetMap.
-- Анализ сетевых потоков в стиле Akvorado.
-- Алерты и уведомления в Telegram, журнал аудита, резервные копии.
-- RBAC, 2FA, API-токены, секреты в OpenBao.
+- AmneziaWG client management: create, block, expiry, quotas, key reissue, bulk operations.
+- QR / `.conf` / `vpn://` and one-time links for handing out access.
+- Live monitoring, traffic analytics, connection map on OpenStreetMap.
+- Akvorado-style network flow analytics.
+- Toast notifications and a notification center, alerts and Telegram notifications, audit log, backups.
+- RBAC, 2FA, API tokens, secrets in OpenBao.
