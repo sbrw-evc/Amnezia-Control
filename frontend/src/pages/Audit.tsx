@@ -6,6 +6,7 @@ import { Fmt } from "@/lib/format";
 import { useLive } from "@/lib/live";
 import { Badge, Card, Page, PageHeader, type Tone } from "@/components/ui/Primitives";
 import { Skeleton } from "@/components/ui/Feedback";
+import { Select } from "@/components/ui/Controls";
 
 const ACTIONS: Record<string, [string, Tone]> = {
   "auth.login": ["Вход", "green"], "auth.login_failed": ["Неудачный вход", "red"], "auth.password_changed": ["Смена пароля", "blue"],
@@ -34,12 +35,13 @@ export default function Audit() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input className="input pl-9" placeholder="Поиск по объекту или действию" value={q} onChange={(e) => { setQ(e.target.value); setOffset(0); }} />
         </div>
-        <select className="input !w-auto" value={action} onChange={(e) => { setAction(e.target.value); setOffset(0); }}>
-          <option value="">Все действия</option>
-          <option value="client.">Клиенты</option><option value="auth.">Аутентификация</option>
-          <option value="panel_user.">Операторы</option><option value="server.">Сервер</option>
-          <option value="routing.">Маршрутизация</option><option value="settings.">Настройки</option>
-        </select>
+        <div className="w-[220px]">
+          <Select value={action} onChange={(v) => { setAction(v); setOffset(0); }} options={[
+            { value: "", label: "Все действия" }, { value: "client.", label: "Клиенты" }, { value: "auth.", label: "Аутентификация" },
+            { value: "panel_user.", label: "Операторы" }, { value: "api_token.", label: "API-токены" }, { value: "server.", label: "Сервер" },
+            { value: "routing.", label: "Маршрутизация" }, { value: "flows.", label: "Потоки" }, { value: "backup.", label: "Резервные копии" },
+            { value: "settings.", label: "Настройки" }, { value: "notifications.", label: "Уведомления" }]} />
+        </div>
       </div>
       <Card bodyClass="p-0">
         <table className="table-ac">

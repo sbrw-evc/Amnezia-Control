@@ -6,7 +6,9 @@
 @tailwind utilities;
 
 @layer base {
+  :root { color-scheme: dark; }
   html, body, #root { height: 100%; }
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(.7); cursor: pointer; opacity: .8; }
   body { font-feature-settings: "cv11", "ss01"; }
   ::selection { background: rgba(59, 130, 246, .35); }
   * { scrollbar-width: thin; scrollbar-color: #334160 transparent; }

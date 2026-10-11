@@ -7,6 +7,7 @@ import { copyText, useAction } from "@/lib/hooks";
 import type { ApiTokenInfo, Role } from "@/lib/types";
 import { Badge, Card, Field, Modal } from "@/components/ui/Primitives";
 import { confirm } from "@/components/ui/Confirm";
+import { NumberInput, Select } from "@/components/ui/Controls";
 
 export default function ApiTokens() {
   const tokens = useQuery({ queryKey: ["tokens"], queryFn: () => api.admin.tokens() });
@@ -48,11 +49,12 @@ export default function ApiTokens() {
         <form onSubmit={submit} className="space-y-4">
           <Field label="Название"><input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Home Assistant" /></Field>
           <Field label="Роль">
-            <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
-              <option value="viewer">{ROLE_LABEL.viewer}</option><option value="operator">{ROLE_LABEL.operator}</option><option value="admin">{ROLE_LABEL.admin}</option>
-            </select>
+            <Select value={form.role} onChange={(v: Role) => setForm({ ...form, role: v })} options={(["viewer", "operator", "admin"] as Role[]).map((r) => ({ value: r, label: ROLE_LABEL[r] }))} />
           </Field>
-          <Field label="Срок действия, дней" hint="пусто — бессрочно"><input className="input" type="number" min={1} value={form.days} onChange={(e) => setForm({ ...form, days: e.target.value })} /></Field>
+          <Field label="Срок действия, дней" hint="пусто — бессрочно">
+            <NumberInput value={form.days ? Number(form.days) : null} min={1} max={3650} allowEmpty placeholder="∞"
+              onChange={(v) => setForm({ ...form, days: v === null ? "" : String(v) })} />
+          </Field>
           <div className="flex justify-end"><button className="btn-primary" disabled={create.isPending}>Выпустить</button></div>
         </form>
       </Modal>

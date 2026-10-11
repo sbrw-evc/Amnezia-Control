@@ -6,6 +6,7 @@ import { useAction } from "@/lib/hooks";
 import { Badge, Card, Page, PageHeader } from "@/components/ui/Primitives";
 import { ErrorState, Skeleton } from "@/components/ui/Feedback";
 import { confirm } from "@/components/ui/Confirm";
+import { Select } from "@/components/ui/Controls";
 
 function lineDiff(a: string, b: string) {
   const A = new Set(a.split("\n")), B = new Set(b.split("\n"));
@@ -57,10 +58,11 @@ export default function Server() {
       <Card title={<span className="flex items-center gap-2">awg0.conf <Badge>{source}</Badge>{(diff.added || diff.removed) ? <Badge tone="amber">+{diff.added} / −{diff.removed} строк</Badge> : null}</span>}
         actions={<>
           <History size={14} className="text-slate-500" />
-          <select className="input !w-auto !py-1.5 text-xs" value="" onChange={(e) => { if (e.target.value) { loadBackup.mutate(e.target.value); setSource(e.target.value); } }}>
-            <option value="">Резервные копии ({cfg.data?.backups.length ?? 0})</option>
-            {cfg.data?.backups.map((b) => <option key={b} value={b}>{b}</option>)}
-          </select>
+          <div className="w-[240px]">
+            <Select size="sm" value={null} placeholder={`Резервные копии (${cfg.data?.backups.length ?? 0})`} menuWidth={280}
+              onChange={(b: string) => { loadBackup.mutate(b); setSource(b); }}
+              options={(cfg.data?.backups ?? []).map((b) => ({ value: b, label: b }))} />
+          </div>
           <button className="btn-ghost btn-sm" onClick={() => cfg.refetch()}><RotateCcw size={14} /> Сбросить</button>
           <button className="btn-primary btn-sm" disabled={save.isPending || (!diff.added && !diff.removed)} onClick={async () => {
             if (await confirm({ title: "Применить конфиг на сервере?", message: "Перед записью будет создана резервная копия. Изменения применятся через syncconf без разрыва остальных соединений.", confirmLabel: "Применить" }))

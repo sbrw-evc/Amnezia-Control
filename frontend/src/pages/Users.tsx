@@ -10,6 +10,7 @@ import { Badge, Card, Field, Modal, Page, PageHeader } from "@/components/ui/Pri
 import { Skeleton } from "@/components/ui/Feedback";
 import { confirm } from "@/components/ui/Confirm";
 import ApiTokens from "@/components/admin/ApiTokens";
+import { Radio, Select } from "@/components/ui/Controls";
 
 const ROLES: { value: Role; hint: string }[] = [
   { value: "admin", hint: "всё, включая сервер, маршрутизацию, операторов и аудит" },
@@ -52,10 +53,11 @@ export default function Users() {
                   <div className="mono text-slate-500">{u.username}</div>
                 </td>
                 <td>
-                  <select className="input !w-auto !py-1 text-xs" value={u.role} disabled={u.id === me?.id}
-                    onChange={(e) => update.mutate({ id: u.id, d: { role: e.target.value as Role } })}>
-                    {ROLES.map((r) => <option key={r.value} value={r.value}>{ROLE_LABEL[r.value]}</option>)}
-                  </select>
+                  <div className="w-[170px]">
+                    <Select size="sm" value={u.role} disabled={u.id === me?.id}
+                      onChange={(v: Role) => update.mutate({ id: u.id, d: { role: v } })}
+                      options={ROLES.map((r) => ({ value: r.value, label: ROLE_LABEL[r.value] }))} />
+                  </div>
                 </td>
                 <td className="space-x-1">
                   {u.is_active ? <Badge tone="green">активен</Badge> : <Badge tone="red">отключён</Badge>}
@@ -95,12 +97,10 @@ export default function Users() {
             <Field label="Имя"><input className="input" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></Field>
           </div>
           <Field label="Роль">
-            <div className="space-y-2">
+            <div className="space-y-2" role="radiogroup">
               {ROLES.map((r) => (
-                <label key={r.value} className="flex cursor-pointer items-start gap-3 rounded-lg border border-base-700 p-3 hover:border-base-600">
-                  <input type="radio" name="role" checked={form.role === r.value} onChange={() => setForm({ ...form, role: r.value })} className="mt-1" />
-                  <span><span className="block text-sm text-white">{ROLE_LABEL[r.value]}</span><span className="text-xs text-slate-500">{r.hint}</span></span>
-                </label>
+                <Radio key={r.value} checked={form.role === r.value} onChange={() => setForm({ ...form, role: r.value })}
+                  label={ROLE_LABEL[r.value]} hint={r.hint} />
               ))}
             </div>
           </Field>

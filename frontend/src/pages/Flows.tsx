@@ -14,6 +14,7 @@ import { Badge, Card, Kpi, Page, PageHeader, Segmented, StatusDot } from "@/comp
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/Feedback";
 import { confirm } from "@/components/ui/Confirm";
 import Flag from "@/components/ui/Flag";
+import { Checkbox, NumberInput, Select } from "@/components/ui/Controls";
 import { TrafficChart } from "@/components/charts/Charts";
 import { GridCharts, SankeyChart, TimeSeriesChart, UnitFormatter, seriesColor } from "@/components/charts/FlowCharts";
 
@@ -203,11 +204,11 @@ function Visualize() {
             <button className="btn-ghost btn-sm" title="Назад" onClick={() => shift(-1)}><ChevronLeft size={14} /></button>
             <button className="btn-ghost btn-sm" title="Отдалить" onClick={() => shift(0)}><ZoomOut size={14} /></button>
             <button className="btn-ghost btn-sm" title="Вперёд" onClick={() => shift(1)}><ChevronRight size={14} /></button>
-            <select className="input ml-auto !w-auto !py-1 text-xs" value={state.refresh} disabled={state.preset === "custom"}
-              onChange={(e) => set({ refresh: Number(e.target.value) })}>
-              <option value={0}>без автообновления</option><option value={10}>каждые 10 с</option><option value={30}>каждые 30 с</option>
-              <option value={60}>каждую минуту</option><option value={300}>каждые 5 мин</option>
-            </select>
+            <div className="ml-auto w-[170px]">
+              <Select size="sm" value={state.refresh} disabled={state.preset === "custom"} onChange={(v) => set({ refresh: v })} options={[
+                { value: 0, label: "без автообновления" }, { value: 10, label: "каждые 10 с" }, { value: 30, label: "каждые 30 с" },
+                { value: 60, label: "каждую минуту" }, { value: 300, label: "каждые 5 мин" }]} />
+            </div>
           </div>
         </div>
 
@@ -223,21 +224,21 @@ function Visualize() {
               </div>
             ))}
             <div className="flex gap-1">
-              <select className="input !py-1 text-xs" value="" onChange={(e) => e.target.value && set({ dimensions: [...state.dimensions, e.target.value] })}>
-                <option value="">+ добавить измерение</option>
-                {available.map((f) => <option key={f.name} value={f.name}>{f.label} ({f.name})</option>)}
-              </select>
+              <div className="min-w-0 flex-1">
+                <Select size="sm" value={null} placeholder="+ добавить измерение" menuWidth={260}
+                  onChange={(v: string) => set({ dimensions: [...state.dimensions, v] })}
+                  options={available.map((f) => ({ value: f.name, label: f.label, hint: f.name }))} />
+              </div>
               <button className="btn-ghost btn-sm" title="Развернуть порядок" onClick={() => set({ dimensions: [...state.dimensions].reverse() })}><ArrowLeftRight size={12} /></button>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <div><div className="label">Лимит</div><input type="number" min={1} max={50} className="input !py-1.5" value={state.limit} onChange={(e) => set({ limit: Number(e.target.value) || 10 })} /></div>
+          <div><div className="label">Лимит</div><NumberInput value={state.limit} min={1} max={50} onChange={(v) => set({ limit: v ?? 10 })} /></div>
           <div><div className="label">Топ по</div>
-            <select className="input !py-1.5" value={state.limitType} onChange={(e) => set({ limitType: e.target.value })}>
-              <option value="avg">среднему</option><option value="max">пикам</option><option value="last">последним</option>
-            </select></div>
+            <Select value={state.limitType} onChange={(v) => set({ limitType: v })} options={[
+              { value: "avg", label: "среднему" }, { value: "max", label: "пикам" }, { value: "last", label: "последним" }]} /></div>
         </div>
         <div>
           <div className="label">Единицы</div>
@@ -250,9 +251,9 @@ function Visualize() {
             options={[{ value: "stacked", label: "Stacked" }, { value: "stacked100", label: "100%" }, { value: "lines", label: "Lines" },
               { value: "grid", label: "Grid" }, { value: "sankey", label: "Sankey" }]} />
         </div>
-        <div className="space-y-1.5 text-sm">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={state.bidirectional} onChange={(e) => set({ bidirectional: e.target.checked })} /> Двунаправленный (входящий трафик — вниз)</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={state.previousPeriod} onChange={(e) => set({ previousPeriod: e.target.checked })} /> Сравнить с прошлым периодом</label>
+        <div className="flex flex-col gap-2.5">
+          <Checkbox checked={state.bidirectional} onChange={(v) => set({ bidirectional: v })} label="Двунаправленный (входящий трафик — вниз)" />
+          <Checkbox checked={state.previousPeriod} onChange={(v) => set({ previousPeriod: v })} label="Сравнить с прошлым периодом" />
         </div>
 
         <div>

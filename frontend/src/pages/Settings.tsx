@@ -7,6 +7,7 @@ import type { Settings } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { Badge, Card, Field, Page, PageHeader } from "@/components/ui/Primitives";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { Checkbox, NumberInput, Select } from "@/components/ui/Controls";
 import { Skeleton } from "@/components/ui/Feedback";
 
 type Def = { key: string; label: string; hint?: string; type: "text" | "number" | "bool" | "select"; options?: [string, string][] };
@@ -76,16 +77,14 @@ export default function SettingsPage() {
     setForm({ ...form, [d.key]: d.type === "number" ? (v === "" ? null : Number(v)) : v });
 
   const input = (d: Def) => {
-    if (d.type === "bool") return (
-      <label className="flex items-center gap-2 text-sm text-slate-200">
-        <input type="checkbox" disabled={!isAdmin} checked={!!form[d.key]} onChange={(e) => set(d, e.target.checked)} /> {d.label}
-      </label>
-    );
+    if (d.type === "bool") return <Checkbox disabled={!isAdmin} checked={!!form[d.key]} onChange={(v) => set(d, v)} label={d.label} />;
     const control = d.type === "select"
-      ? <select className="input" disabled={!isAdmin} value={String(form[d.key] ?? "")} onChange={(e) => set(d, e.target.value)}>
-          {d.options?.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-      : <input className="input" type={d.type} disabled={!isAdmin} value={String(form[d.key] ?? "")} onChange={(e) => set(d, e.target.value)} />;
+      ? <Select disabled={!isAdmin} value={String(form[d.key] ?? "")} onChange={(v) => set(d, v)}
+          options={(d.options ?? []).map(([v, l]) => ({ value: v, label: l }))} />
+      : d.type === "number"
+        ? <NumberInput disabled={!isAdmin} allowEmpty placeholder="—" value={form[d.key] === null || form[d.key] === "" ? null : Number(form[d.key])}
+            min={0} onChange={(v) => setForm({ ...form, [d.key]: v })} />
+        : <input className="input" disabled={!isAdmin} value={String(form[d.key] ?? "")} onChange={(e) => set(d, e.target.value)} />;
     return <Field label={d.label} hint={d.hint}>{control}</Field>;
   };
 

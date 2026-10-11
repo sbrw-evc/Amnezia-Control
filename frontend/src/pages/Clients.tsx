@@ -14,6 +14,7 @@ import { useAuth } from "@/store/auth";
 import { Badge, Modal, Page, PageHeader, StatusDot, UsageBar } from "@/components/ui/Primitives";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/Feedback";
 import { confirm } from "@/components/ui/Confirm";
+import { Checkbox } from "@/components/ui/Controls";
 import ClientForm from "@/components/clients/ClientForm";
 import ConfigModal from "@/components/clients/ConfigModal";
 import { useClientActions } from "@/components/clients/useClientActions";
@@ -87,7 +88,8 @@ export default function Clients() {
 
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.value, (list.data ?? []).filter(f.test).length])), [list.data]);
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const selectable = rows.filter((r) => !r.system);
+  const allSelected = selectable.length > 0 && selectable.every((r) => selected.has(r.id));
   const th = (key: SortKey, label: string) => (
     <th className="cursor-pointer select-none hover:text-slate-300" onClick={() => setSort((s) => ({ key, dir: s.key === key ? (-s.dir as 1 | -1) : -1 }))}>
       {label} {sort.key === key && (sort.dir === 1 ? "▲" : "▼")}
@@ -150,7 +152,8 @@ export default function Clients() {
           <table className="table-ac min-w-[1100px]">
             <thead>
               <tr>
-                {canEdit && <th className="w-8"><input type="checkbox" checked={allSelected} onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))} /></th>}
+                {canEdit && <th className="w-8"><Checkbox checked={allSelected} indeterminate={!allSelected && selected.size > 0} title="Выбрать все"
+                  onChange={() => setSelected(allSelected ? new Set() : new Set(rows.filter((r) => !r.system).map((r) => r.id)))} /></th>}
                 {th("name", "Клиент")}
                 <th>Адрес</th>
                 <th>Статус</th>
@@ -167,7 +170,7 @@ export default function Clients() {
               {list.isLoading && Array.from({ length: 6 }, (_, i) => <tr key={i}><td colSpan={11}><Skeleton className="h-6" /></td></tr>)}
               {rows.map((c) => (
                 <tr key={c.id} className={clsx("cursor-pointer", selected.has(c.id) && "bg-accent/5")} onClick={() => nav(`/clients/${c.id}`)}>
-                  {canEdit && <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} disabled={c.system} /></td>}
+                  {canEdit && <td onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(c.id)} onChange={() => toggle(c.id)} disabled={c.system} /></td>}
                   <td>
                     <div className="flex items-center gap-2">
                       <StatusDot on={c.online} />

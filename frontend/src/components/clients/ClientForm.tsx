@@ -3,6 +3,7 @@ import clsx from "clsx";
 import type { ClientInput } from "@/lib/api";
 import type { VpnClient } from "@/lib/types";
 import { Field } from "@/components/ui/Primitives";
+import { NumberInput } from "@/components/ui/Controls";
 
 const GB = 1024 ** 3;
 const VALIDITY = [
@@ -56,7 +57,8 @@ export default function ClientForm({ initial, submitLabel, busy, onSubmit }: {
         </div>
       </Field>
       <Field label="Месячная квота, ГБ" hint="пусто — без ограничений; при превышении блокировка до 1-го числа">
-        <input type="number" min={0} step="0.5" className="input max-w-[200px]" value={quota} onChange={(e) => setQuota(e.target.value)} placeholder="∞" />
+        <NumberInput className="max-w-[200px]" value={quota ? Number(quota) : null} min={0} step={0.5} allowEmpty placeholder="∞"
+          onChange={(v) => setQuota(v === null ? "" : String(v))} />
       </Field>
       <Field label="Заметка"><textarea className="input min-h-[70px]" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
       <div className="flex justify-end"><button className="btn-primary" disabled={busy || !name.trim()}>{submitLabel}</button></div>
