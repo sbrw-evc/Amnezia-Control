@@ -51,6 +51,7 @@ class VpnClient(TimestampMixin, Base):
     __tablename__ = "vpn_clients"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     public_key: Mapped[str] = mapped_column(String(64), unique=True)
+    server: Mapped[str] = mapped_column(String(16), default="amnezia", server_default="amnezia", index=True)
     name: Mapped[str] = mapped_column(String(128))
     owner: Mapped[str] = mapped_column(String(128), default="")
     contact: Mapped[str] = mapped_column(String(128), default="")

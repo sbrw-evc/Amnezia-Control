@@ -21,8 +21,13 @@ def _filename(name: str) -> str:
 
 @router.get("")
 async def list_clients(q: str | None = None, status: str | None = None, tag: str | None = None,
-                       _: Principal = Depends(viewer), c: Container = Depends(container)):
-    return await c.clients.list(q, status, tag)
+                       server: str | None = None, _: Principal = Depends(viewer), c: Container = Depends(container)):
+    return await c.clients.list(q, status, tag, server)
+
+
+@router.get("/servers")
+async def servers(_: Principal = Depends(viewer), c: Container = Depends(container)):
+    return await c.clients.servers()
 
 
 @router.get("/tags")

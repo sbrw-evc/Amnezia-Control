@@ -9,7 +9,7 @@ from ..db.models import ConnectionEvent
 from ..db.repositories import ClientRepo, ConnectionRepo, TrafficRepo
 from ..domain.errors import ExternalServiceError
 from ..domain.models import Severity
-from ..ports import GeoLocator, VpnServerGateway
+from ..ports import GeoLocator, VpnBackend
 from .alerts import AlertService
 from .clients import ONLINE_SECONDS, VpnClientService
 from .common import EventBus, utcnow
@@ -18,10 +18,10 @@ log = logging.getLogger(__name__)
 
 
 class TrafficCollector:
-    def __init__(self, db: Database, gateway: VpnServerGateway, clients: VpnClientService, geo: GeoLocator,
+    def __init__(self, db: Database, backends: list[VpnBackend], clients: VpnClientService, geo: GeoLocator,
                  alerts: AlertService, bus: EventBus):
         self._db = db
-        self._gw = gateway
+        self._backends = backends
         self._clients = clients
         self._geo = geo
         self._alerts = alerts
@@ -29,13 +29,10 @@ class TrafficCollector:
         self._last_poll: float | None = None
 
     async def poll(self) -> None:
-        try:
-            runtime = await self._gw.runtime()
-        except ExternalServiceError as e:
+        runtime, ok = await self._collect()
+        if not ok and not runtime:
             self._bus.publish("live", {"server_ok": False})
-            await self._alerts.raise_("server.unreachable", Severity.CRITICAL, "VPN-сервер недоступен", e.message)
             return
-        await self._alerts.resolve("server.unreachable")
 
         now_mono = time.monotonic()
         elapsed = (now_mono - self._last_poll) if self._last_poll else None
@@ -77,10 +74,22 @@ class TrafficCollector:
                 elif peer.endpoint_ip and c.lat is None:
                     await self._backfill_geo(conns, c, peer.endpoint_ip)
         self._bus.publish("live", {
-            "t": now.isoformat(), "elapsed": bool(elapsed), "server_ok": True, "online": online,
+            "t": now.isoformat(), "elapsed": bool(elapsed), "server_ok": ok, "online": online,
             "rx": round(sum_rx / elapsed) if elapsed else 0, "tx": round(sum_tx / elapsed) if elapsed else 0,
             "clients": rates,
         })
+
+    async def _collect(self) -> tuple[dict, bool]:
+        runtime, ok = {}, True
+        for b in self._backends:
+            try:
+                runtime.update(await b.runtime())
+            except ExternalServiceError as e:
+                ok = False
+                await self._alerts.raise_(b.alert_key, Severity.CRITICAL, f"VPN-сервер {b.title} недоступен", e.message)
+                continue
+            await self._alerts.resolve(b.alert_key)
+        return runtime, ok
 
     def _record_endpoint(self, conns: ConnectionRepo, c, ip: str | None, endpoint: str) -> None:
         c.last_endpoint = endpoint

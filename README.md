@@ -16,6 +16,8 @@ Telegram alerts, backups and secret storage in OpenBao.
 - **VPN clients** — create clients with an access period, monthly quota, tags and owner; block manually or automatically
   (expiry, quota); reissue keys; bulk actions; CSV export.
 - **Config delivery** — QR code and `.conf` for AmneziaWG, a `vpn://` key for Amnezia VPN, one-time links with an expiry.
+- **VPN on MikroTik** — a WireGuard server on the home router managed alongside Amnezia: one-click setup, the same client
+  lifecycle, quotas, traffic and configs; clients reach the home network, sites from the list go through Amnezia.
 - **Monitoring** — live throughput (SSE), traffic per period, top clients, activity heatmap, countries.
 - **Connection map** — OpenStreetMap (served through the panel's own caching tile proxy), DB-IP Lite geolocation.
 - **Flow analytics** — NetFlow v9 from MikroTik into ClickHouse; overview, visualization (stacked / 100% / lines / grid / sankey),

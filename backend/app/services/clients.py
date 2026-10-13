@@ -6,18 +6,20 @@ import hashlib
 import secrets
 import uuid
 
-from ..adapters.amnezia import AwgConfigCodec
+import logging
+
 from ..db.base import Database
 from ..db.models import ShareLink, VpnClient
 from ..db.repositories import ClientRepo, ConnectionRepo, ShareRepo, TrafficRepo
-from ..domain.errors import DomainError, NotFound
-from ..domain.models import BlockReason, ClientStatus, PeerEntry
-from ..ports import SecretStore, VpnServerGateway
+from ..domain.errors import DomainError, ExternalServiceError, NotFound
+from ..domain.models import BlockReason, ClientBundle, ClientStatus
+from ..ports import SecretStore, VpnBackend
 from .audit import AuditService
 from .common import Actor, EventBus, utcnow
-from .configs import ClientBundle, ClientConfigBuilder
-from .server import ServerConfigEditor, generate_keypair
+from .server import generate_keypair
 from .settings import SettingsService
+
+log = logging.getLogger(__name__)
 
 ONLINE_SECONDS = 180
 GB = 1024 ** 3
@@ -40,7 +42,7 @@ class ClientView:
         online = bool(c.last_handshake_at and (now - c.last_handshake_at).total_seconds() < ONLINE_SECONDS)
         live = live or {}
         return {
-            "id": str(c.id), "public_key": c.public_key, "name": c.name, "owner": c.owner, "contact": c.contact,
+            "id": str(c.id), "server": c.server, "public_key": c.public_key, "name": c.name, "owner": c.owner, "contact": c.contact,
             "tags": c.tags or [], "note": c.note, "address": c.address, "status": c.status.value,
             "block_reason": c.block_reason.value if c.block_reason else None, "managed": c.managed, "system": c.system,
             "expires_at": iso(c.expires_at), "quota_bytes": c.quota_bytes,
@@ -55,29 +57,40 @@ class ClientView:
 
 
 class VpnClientService:
-    def __init__(self, db: Database, editor: ServerConfigEditor, gateway: VpnServerGateway, secrets_store: SecretStore,
-                 builder: ClientConfigBuilder, settings: SettingsService, audit: AuditService, bus: EventBus,
-                 default_host: str, public_base_url: str, live):
+    def __init__(self, db: Database, backends: list[VpnBackend], secrets_store: SecretStore,
+                 settings: SettingsService, audit: AuditService, bus: EventBus, public_base_url: str, live):
         self._live = live
         self._db = db
-        self._editor = editor
-        self._gw = gateway
+        self.backends = {b.kind: b for b in backends}
         self._secrets = secrets_store
-        self._builder = builder
         self._settings = settings
         self._audit = audit
         self._bus = bus
-        self._default_host = default_host
         self._public_base = public_base_url.rstrip("/")
 
     @staticmethod
     def _secret_path(client_id: uuid.UUID) -> str:
         return f"clients/{client_id}"
 
+    def backend(self, kind: str) -> VpnBackend:
+        b = self.backends.get(kind)
+        if not b:
+            raise DomainError(f"Неизвестный VPN-сервер: {kind}")
+        return b
 
-    async def list(self, q: str | None = None, status: str | None = None, tag: str | None = None) -> list[dict]:
+    async def servers(self) -> list[dict]:
+        async def one(b: VpnBackend) -> dict:
+            try:
+                ready = await b.ready()
+            except ExternalServiceError:
+                ready = False
+            return {"kind": b.kind, "title": b.title, "ready": ready}
+        return list(await asyncio.gather(*(one(b) for b in self.backends.values())))
+
+    async def list(self, q: str | None = None, status: str | None = None, tag: str | None = None,
+                   server: str | None = None) -> list[dict]:
         async with self._db.session() as s:
-            clients = await ClientRepo(s).search(q, status, tag)
+            clients = await ClientRepo(s).search(q, status, tag, server)
             month = await TrafficRepo(s).totals_by_client(month_start())
         return [ClientView.dto(c, month.get(c.id, (0, 0)), self._live.rates.get(str(c.id))) for c in clients]
 
@@ -97,26 +110,24 @@ class VpnClientService:
 
 
     async def create(self, actor: Actor, *, name: str, owner: str = "", contact: str = "", tags: list[str] | None = None,
-                     note: str = "", expires_at: dt.datetime | None = None, quota_gb: float | None = None) -> dict:
+                     note: str = "", expires_at: dt.datetime | None = None, quota_gb: float | None = None,
+                     server: str = "amnezia") -> dict:
         name = name.strip()[:128]
         if not name:
             raise DomainError("Укажите имя клиента")
+        backend = self.backend(server)
         keys = generate_keypair()
-        psk = await self._gw.preshared_key()
-        async with self._editor.edit() as cfg:
-            address = cfg.free_address()
-            lines = AwgConfigCodec.peer_lines(keys.public_key, psk, address)
-            cfg.peers.append(PeerEntry(keys.public_key, address, psk, False, lines))
+        peer = await backend.add_peer(keys.public_key, name)
         client_id = uuid.uuid4()
         await self._secrets.put(self._secret_path(client_id), {"private_key": keys.private_key,
-                                                               "public_key": keys.public_key})
-        await self._table_upsert(keys.public_key, name, address)
+                                                               "public_key": keys.public_key,
+                                                               "psk": peer.preshared_key})
         async with self._db.session() as s:
             c = ClientRepo(s).add(VpnClient(
-                id=client_id, public_key=keys.public_key, name=name, owner=owner, contact=contact, tags=self._tags(tags),
-                note=note, address=address, managed=True, created_by=actor.username, expires_at=expires_at,
-                quota_bytes=int(quota_gb * GB) if quota_gb else None))
-            self._audit.record(s, actor, "client.created", "client", c.id, name, address=address)
+                id=client_id, server=server, public_key=keys.public_key, name=name, owner=owner, contact=contact,
+                tags=self._tags(tags), note=note, address=peer.address, managed=True, created_by=actor.username,
+                expires_at=expires_at, quota_bytes=int(quota_gb * GB) if quota_gb else None))
+            self._audit.record(s, actor, "client.created", "client", c.id, name, address=peer.address, server=server)
         self._bus.publish("clients", {"id": str(client_id)})
         return await self.get(client_id)
 
@@ -137,9 +148,9 @@ class VpnClientService:
                     changes[k] = str(v)
                     setattr(c, k, v)
             self._audit.record(s, actor, "client.updated", "client", c.id, c.name, **changes)
-            pub, name, address = c.public_key, c.name, c.address
+            pub, name, address, server = c.public_key, c.name, c.address, c.server
         if "name" in changes:
-            await self._table_upsert(pub, name, address)
+            await self.backend(server).rename_peer(pub, name, address)
         self._bus.publish("clients", {"id": str(client_id)})
         return await self.get(client_id)
 
@@ -149,12 +160,8 @@ class VpnClientService:
             c = await ClientRepo(s).require(client_id)
             if c.system and blocked:
                 raise DomainError("Системный клиент (домашний шлюз) нельзя блокировать")
-            pub = c.public_key
-        async with self._editor.edit() as cfg:
-            peer = cfg.peer(pub)
-            if not peer:
-                raise NotFound("Пир не найден в конфиге сервера — выполните синхронизацию")
-            peer.disabled = blocked
+            pub, server = c.public_key, c.server
+        await self.backend(server).set_disabled(pub, blocked)
         async with self._db.session() as s:
             c = await ClientRepo(s).require(client_id)
             c.status = ClientStatus.BLOCKED if blocked else ClientStatus.ACTIVE
@@ -167,17 +174,13 @@ class VpnClientService:
     async def reissue(self, actor: Actor, client_id: uuid.UUID) -> dict:
         async with self._db.session() as s:
             c = await ClientRepo(s).require(client_id)
-            old_pub, name = c.public_key, c.name
+            old_pub, server = c.public_key, c.server
         keys = generate_keypair()
-        async with self._editor.edit() as cfg:
-            peer = cfg.peer(old_pub)
-            if not peer:
-                raise NotFound("Пир не найден в конфиге сервера")
-            peer.lines = [f"PublicKey = {keys.public_key}" if l.strip().startswith("PublicKey") else l for l in peer.lines]
-            peer.public_key = keys.public_key
+        old_secret = await self._secrets.get(self._secret_path(client_id)) or {}
+        await self.backend(server).rekey_peer(old_pub, keys.public_key)
         await self._secrets.put(self._secret_path(client_id), {"private_key": keys.private_key,
-                                                               "public_key": keys.public_key})
-        await self._table_rekey(old_pub, keys.public_key, name)
+                                                               "public_key": keys.public_key,
+                                                               "psk": old_secret.get("psk")})
         async with self._db.session() as s:
             c = await ClientRepo(s).require(client_id)
             c.public_key, c.managed, c.raw_rx, c.raw_tx, c.config_downloaded_at = keys.public_key, True, 0, 0, None
@@ -190,10 +193,8 @@ class VpnClientService:
             c = await ClientRepo(s).require(client_id)
             if c.system:
                 raise DomainError("Системный клиент (домашний шлюз) нельзя удалить из панели")
-            pub = c.public_key
-        async with self._editor.edit() as cfg:
-            cfg.peers = [p for p in cfg.peers if p.public_key != pub]
-        await self._table_remove(pub)
+            pub, server = c.public_key, c.server
+        await self.backend(server).remove_peer(pub)
         await self._secrets.delete(self._secret_path(client_id))
         async with self._db.session() as s:
             c = await ClientRepo(s).require(client_id)
@@ -225,12 +226,9 @@ class VpnClientService:
             secret = await self._secrets.get(self._secret_path(c.id))
             if not secret:
                 raise DomainError("Ключ клиента не найден в OpenBao. Перевыпустите ключи.")
-            st = await self._settings.all()
-            server = await self._editor.load()
-            bundle = await asyncio.to_thread(
-                self._builder.build, name=c.name, server=server, server_public_key=await self._gw.server_public_key(),
-                psk=await self._gw.preshared_key(), private_key=secret["private_key"], public_key=c.public_key,
-                address=c.address, endpoint_host=st["endpoint_host"] or self._default_host, dns=st["client_dns"])
+            bundle = await self.backend(c.server).bundle(
+                name=c.name, private_key=secret["private_key"], public_key=c.public_key, address=c.address,
+                preshared_key=secret.get("psk"))
             c.config_downloaded_at = utcnow()
             if actor:
                 self._audit.record(s, actor, "client.config_viewed", "client", c.id, c.name)
@@ -262,19 +260,35 @@ class VpnClientService:
 
 
     async def sync(self, actor: Actor | None = None) -> dict:
-        cfg = await self._editor.load()
-        table = {t.get("clientId"): t.get("userData", {}) for t in await self._gw.read_clients_table()}
-        peers = {p.public_key: p for p in cfg.peers if p.public_key}
+        total = {"imported": 0, "missing": 0, "peers": 0}
+        for backend in self.backends.values():
+            try:
+                res = await self._sync_backend(backend, actor)
+            except ExternalServiceError as e:
+                log.warning("sync %s skipped: %s", backend.kind, e.message)
+                continue
+            for k in total:
+                total[k] += res[k]
+        if total["imported"] or total["missing"]:
+            self._bus.publish("clients", {"sync": True})
+        return total
+
+    async def _sync_backend(self, backend: VpnBackend, actor: Actor | None) -> dict:
+        if not await backend.ready():
+            return {"imported": 0, "missing": 0, "peers": 0}
+        peers = {p.public_key: p for p in await backend.peers() if p.public_key}
+        names = await backend.names()
         imported, missing = 0, 0
         async with self._db.session() as s:
             repo = ClientRepo(s)
-            known = {c.public_key: c for c in await repo.all()}
+            known = {c.public_key: c for c in await repo.all(VpnClient.server == backend.kind)}
             for pub, p in peers.items():
                 c = known.get(pub)
                 if c is None:
-                    ud = table.get(pub, {})
-                    c = repo.add(VpnClient(public_key=pub, name=ud.get("clientName") or pub[:10], address=p.address,
-                                           managed=False, created_by="import"))
+                    if await repo.by_public_key(pub):
+                        continue
+                    c = repo.add(VpnClient(server=backend.kind, public_key=pub, name=names.get(pub) or pub[:10],
+                                           address=p.address, managed=False, created_by="import"))
                     imported += 1
                 c.address = p.address
                 if p.disabled and c.status != ClientStatus.BLOCKED:
@@ -286,33 +300,9 @@ class VpnClientService:
                     c.status = ClientStatus.MISSING
                     missing += 1
             if actor and (imported or missing):
-                self._audit.record(s, actor, "client.sync", "server", "", "", imported=imported, missing=missing)
-        if imported or missing:
-            self._bus.publish("clients", {"sync": True})
+                self._audit.record(s, actor, "client.sync", "server", backend.kind, backend.title,
+                                   imported=imported, missing=missing)
         return {"imported": imported, "missing": missing, "peers": len(peers)}
-
-
-    async def _table_upsert(self, pub: str, name: str, address: str) -> None:
-        table = await self._gw.read_clients_table()
-        for t in table:
-            if t.get("clientId") == pub:
-                t.setdefault("userData", {})["clientName"] = name
-                break
-        else:
-            table.append({"clientId": pub, "userData": {
-                "clientName": name, "allowedIps": address, "allowed_ips": address,
-                "creationDate": dt.datetime.now().strftime("%a %b %d %H:%M:%S %Y")}})
-        await self._gw.write_clients_table(table)
-
-    async def _table_remove(self, pub: str) -> None:
-        await self._gw.write_clients_table([t for t in await self._gw.read_clients_table() if t.get("clientId") != pub])
-
-    async def _table_rekey(self, old: str, new: str, name: str) -> None:
-        table = await self._gw.read_clients_table()
-        for t in table:
-            if t.get("clientId") == old:
-                t["clientId"] = new
-        await self._gw.write_clients_table(table)
 
     @staticmethod
     def _tags(tags) -> list[str]:

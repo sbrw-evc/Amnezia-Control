@@ -111,7 +111,7 @@ export function Segmented<T extends string>({ value, options, onChange, layoutId
   return (
     <div className="inline-flex rounded-lg border border-base-700 bg-base-950/60 p-0.5">
       {options.map((o) => (
-        <button key={o.value} onClick={() => onChange(o.value)}
+        <button type="button" key={o.value} onClick={() => onChange(o.value)}
           className={clsx("relative rounded-md px-2.5 py-1 text-xs font-medium transition", value === o.value ? "text-white" : "text-slate-400 hover:text-slate-200")}>
           {value === o.value && <motion.span layoutId={layoutId} className="absolute inset-0 rounded-md bg-accent/80"
             transition={{ type: "spring", stiffness: 400, damping: 32 }} />}

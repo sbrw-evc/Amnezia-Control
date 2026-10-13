@@ -1,7 +1,7 @@
 import type {
   Alert, ApiTokenInfo, AuditItem, BackupItem, CustomPrefix, FlowField, FlowOverview, FlowQuery, FlowRecord, FlowResult,
   FlowStatus, RouteCheck, SavedFilter, ClientBundle, GeoData, HeatCell, LivePoint, PanelUser, Range, RouterStatus, SeriesPoint,
-  ServerInfo, Session, Settings, SiteListSummary, Summary, TopRow, VpnClient,
+  MikrotikVpnInfo, ServerInfo, ServerKind, Session, Settings, SiteListSummary, Summary, TopRow, VpnClient, VpnServer,
 } from "./types";
 
 export class ApiError extends Error {
@@ -70,11 +70,12 @@ export class AuthApi extends Resource {
 
 export interface ClientInput {
   name: string; owner?: string; contact?: string; tags?: string[]; note?: string;
-  expires_at?: string | null; quota_gb?: number | null;
+  expires_at?: string | null; quota_gb?: number | null; server?: ServerKind;
 }
 
 export class ClientsApi extends Resource {
-  list(q?: { q?: string; status?: string; tag?: string }) { return this.http.get<VpnClient[]>("/api/clients", q); }
+  list(q?: { q?: string; status?: string; tag?: string; server?: string }) { return this.http.get<VpnClient[]>("/api/clients", q); }
+  servers() { return this.http.get<VpnServer[]>("/api/clients/servers"); }
   get(id: string) { return this.http.get<VpnClient>(`/api/clients/${id}`); }
   tags() { return this.http.get<string[]>("/api/clients/tags"); }
   create(data: ClientInput) { return this.http.post<VpnClient>("/api/clients", data); }
@@ -107,6 +108,8 @@ export class OpsApi extends Resource {
     return this.http.get<{ total: number; items: AuditItem[] }>("/api/audit", q);
   }
   serverInfo() { return this.http.get<ServerInfo>("/api/server/info"); }
+  mikrotikVpn() { return this.http.get<MikrotikVpnInfo>("/api/mikrotik-vpn"); }
+  setupMikrotikVpn() { return this.http.post<MikrotikVpnInfo>("/api/mikrotik-vpn/setup"); }
   serverConfig() { return this.http.get<{ config: string; backups: string[] }>("/api/server/config"); }
   saveServerConfig(config: string) { return this.http.put("/api/server/config", { config }); }
   backup(name: string) { return this.http.get<{ config: string }>(`/api/server/backups/${encodeURIComponent(name)}`); }

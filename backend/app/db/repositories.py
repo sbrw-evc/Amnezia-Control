@@ -86,7 +86,8 @@ class ClientRepo(Repository[VpnClient]):
     async def by_public_key(self, pub: str) -> VpnClient | None:
         return (await self.s.execute(select(VpnClient).where(VpnClient.public_key == pub))).scalar_one_or_none()
 
-    async def search(self, q: str | None = None, status: str | None = None, tag: str | None = None) -> Sequence[VpnClient]:
+    async def search(self, q: str | None = None, status: str | None = None, tag: str | None = None,
+                     server: str | None = None) -> Sequence[VpnClient]:
         where = []
         if q:
             like = f"%{q.lower()}%"
@@ -96,6 +97,8 @@ class ClientRepo(Repository[VpnClient]):
             where.append(VpnClient.status == status)
         if tag:
             where.append(VpnClient.tags.any(tag))
+        if server:
+            where.append(VpnClient.server == server)
         return await self.all(*where, order_by=VpnClient.created_at)
 
     async def all_tags(self) -> list[str]:

@@ -102,6 +102,20 @@ async def server_backup(name: str, _: Principal = Depends(admin), c: Container =
     return {"config": await c.server.backup(name)}
 
 
+@router.get("/mikrotik-vpn")
+async def mikrotik_vpn(_: Principal = Depends(viewer), c: Container = Depends(container)):
+    return await c.mikrotik.info()
+
+
+@router.post("/mikrotik-vpn/setup")
+async def mikrotik_vpn_setup(p: Principal = Depends(admin), c: Container = Depends(container)):
+    await c.mikrotik.wg.setup()
+    async with c.db.session() as s:
+        c.audit.record(s, p.actor, "mikrotik_vpn.setup", "router", c.mikrotik.wg.iface, "WireGuard",
+                       network=str(c.mikrotik.wg.network), port=c.mikrotik.wg.port)
+    return await c.mikrotik.info()
+
+
 @router.get("/routing/status")
 async def routing_status(_: Principal = Depends(viewer), c: Container = Depends(container)):
     return {"router": await c.routing.status(), "site_list": await c.routing.site_list()}

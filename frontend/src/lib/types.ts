@@ -16,8 +16,13 @@ export interface PanelUser {
   locked: boolean;
 }
 
+export type ServerKind = "amnezia" | "mikrotik";
+export interface VpnServer { kind: ServerKind; title: string; ready: boolean }
+export const SERVER_LABEL: Record<ServerKind, string> = { amnezia: "Amnezia", mikrotik: "MikroTik" };
+
 export interface VpnClient {
   id: string;
+  server: ServerKind;
   public_key: string;
   name: string;
   owner: string;
@@ -142,6 +147,12 @@ export interface AuditItem {
   target_name: string;
   details: Record<string, unknown>;
   ip: string;
+}
+
+export interface MikrotikVpnInfo {
+  configured: boolean; interface: string; network: string; server_ip: string; lan_cidr: string; port: number;
+  public_key: string | null; running: boolean; public_address: string; endpoint_host: string;
+  client_dns: string; allowed_ips: string; peers_total: number; peers_disabled: number;
 }
 
 export interface ServerInfo {

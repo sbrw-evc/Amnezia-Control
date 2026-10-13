@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     router_ssh_user: str = "admin"
     gateway_ip: str = "192.168.0.210"
     lan_cidr: str = "192.168.0.0/24"
+    mt_wg_iface: str = "wg-ac"
+    mt_wg_network: str = "10.9.0.0/24"
+    mt_wg_port: int = 51820
 
     clickhouse_url: str = "http://clickhouse:8123"
     clickhouse_user: str = "amnezia"

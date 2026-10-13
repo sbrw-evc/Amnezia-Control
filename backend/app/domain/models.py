@@ -71,3 +71,17 @@ class GeoPoint:
 class KeyPair:
     private_key: str
     public_key: str
+
+
+@dataclass(frozen=True)
+class ClientBundle:
+    name: str
+    config: str
+    amnezia_key: str
+    qr_svg: str
+
+
+@dataclass(frozen=True)
+class NewPeer:
+    address: str
+    preshared_key: str | None

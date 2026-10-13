@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
   Activity, Archive, BarChart3, Waypoints, Bell, ChevronsLeft, FileClock, Globe2, LayoutDashboard, LogOut, Network, Server,
-  Settings, Shield, Users, UserCog,
+  Router, Settings, Shield, Users, UserCog,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
@@ -40,6 +40,7 @@ export default function Sidebar({ collapsed, onToggle, onNavigate, onNotificatio
     ] },
     { title: "Управление", items: [
       { to: "/clients", label: "Клиенты VPN", icon: <Users size={18} /> },
+      { to: "/mikrotik-vpn", label: "VPN на MikroTik", icon: <Router size={18} /> },
       { to: "/routing", label: "Маршрутизация", icon: <Network size={18} /> },
     ] },
     { title: "Система", items: [

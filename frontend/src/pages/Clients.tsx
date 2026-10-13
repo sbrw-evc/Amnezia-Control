@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 import { Fmt, REASON_LABEL } from "@/lib/format";
 import Flag from "@/components/ui/Flag";
 import { useAction } from "@/lib/hooks";
-import type { VpnClient } from "@/lib/types";
+import { SERVER_LABEL, type ServerKind, type VpnClient } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { Badge, Modal, Page, PageHeader, StatusDot, UsageBar } from "@/components/ui/Primitives";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/Feedback";
@@ -31,10 +31,10 @@ const FILTERS: { value: Filter; label: string; test: (c: VpnClient) => boolean }
 type SortKey = "name" | "month" | "total" | "handshake" | "rate";
 
 function exportCsv(clients: VpnClient[]) {
-  const head = ["Имя", "Владелец", "Контакт", "Теги", "Адрес", "Статус", "Онлайн", "Месяц, байт", "Всего, байт", "Квота, байт",
+  const head = ["Сервер", "Имя", "Владелец", "Контакт", "Теги", "Адрес", "Статус", "Онлайн", "Месяц, байт", "Всего, байт", "Квота, байт",
     "Доступ до", "Страна", "Город", "Последний handshake", "Создан"];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = clients.map((c) => [c.name, c.owner, c.contact, c.tags.join(" "), c.address, c.status, c.online ? "да" : "нет",
+  const lines = clients.map((c) => [SERVER_LABEL[c.server], c.name, c.owner, c.contact, c.tags.join(" "), c.address, c.status, c.online ? "да" : "нет",
     c.month_rx + c.month_tx, c.total_rx + c.total_tx, c.quota_bytes ?? "", c.expires_at ?? "", c.country ?? "", c.city ?? "",
     c.last_handshake_at ?? "", c.created_at ?? ""].map(esc).join(";"));
   const blob = new Blob(["﻿" + [head.map(esc).join(";"), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
@@ -50,6 +50,7 @@ export default function Clients() {
   const canEdit = useAuth((s) => s.can("operator"));
   const [filter, setFilter] = useState<Filter>("all");
   const [tag, setTag] = useState<string | null>(null);
+  const [server, setServer] = useState<ServerKind | null>(null);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "rate", dir: -1 });
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -60,6 +61,7 @@ export default function Clients() {
   const list = useQuery({ queryKey: ["clients"], queryFn: () => api.clients.list(), refetchInterval: 15_000 });
   const tags = useQuery({ queryKey: ["clients", "tags"], queryFn: () => api.clients.tags() });
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.ops.settings(), enabled: creating });
+  const servers = useQuery({ queryKey: ["vpn-servers"], queryFn: () => api.clients.servers(), staleTime: 30_000 });
   const actions = useClientActions();
   const create = useAction(api.clients.create.bind(api.clients), {
     success: "Клиент создан", invalidate: [["clients"], ["summary"]],
@@ -81,10 +83,10 @@ export default function Clients() {
       handshake: c.last_handshake_at ? Date.parse(c.last_handshake_at) : 0, rate: c.rate_rx + c.rate_tx + (c.online ? 1e-9 : 0),
     })[sort.key];
     return (list.data ?? [])
-      .filter((c) => f(c) && (!tag || c.tags.includes(tag)))
+      .filter((c) => f(c) && (!tag || c.tags.includes(tag)) && (!server || c.server === server))
       .filter((c) => !s || [c.name, c.owner, c.address, c.city ?? "", c.public_key].some((v) => v.toLowerCase().includes(s)))
       .sort((a, b) => (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : 0) * sort.dir);
-  }, [list.data, filter, tag, q, sort]);
+  }, [list.data, filter, tag, server, q, sort]);
 
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.value, (list.data ?? []).filter(f.test).length])), [list.data]);
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -119,6 +121,13 @@ export default function Clients() {
             <button key={f.value} className={clsx("chip", filter === f.value && "chip-on")} onClick={() => setFilter(f.value)}>
               {f.value === "online" && <StatusDot on pulse={false} />}{f.label}
               <span className="rounded bg-base-950/60 px-1 text-[10px] text-slate-400">{counts[f.value] ?? 0}</span>
+            </button>
+          ))}
+          <span className="mx-1 h-5 w-px bg-base-700" />
+          {(servers.data ?? []).map((s) => (
+            <button key={s.kind} className={clsx("chip", server === s.kind && "chip-on")} onClick={() => setServer(server === s.kind ? null : s.kind)}>
+              {SERVER_LABEL[s.kind]}
+              <span className="rounded bg-base-950/60 px-1 text-[10px] text-slate-400">{(list.data ?? []).filter((c) => c.server === s.kind).length}</span>
             </button>
           ))}
           {!!tags.data?.length && <span className="mx-1 h-5 w-px bg-base-700" />}
@@ -175,6 +184,7 @@ export default function Clients() {
                     <div className="flex items-center gap-2">
                       <StatusDot on={c.online} />
                       <span className="max-w-[260px] truncate font-medium text-slate-100" title={c.name}>{c.name}</span>
+                      {c.server === "mikrotik" && <Badge tone="blue" className="!px-1">MikroTik</Badge>}
                       {c.system && <Badge tone="violet">шлюз</Badge>}
                       {!c.managed && <Badge tone="amber" className="!px-1">без ключа</Badge>}
                     </div>
@@ -222,7 +232,7 @@ export default function Clients() {
       </div>
 
       <Modal open={creating} onClose={() => setCreating(false)} title="Новый клиент VPN" wide>
-        <ClientForm key={settings.dataUpdatedAt} submitLabel="Создать и выдать конфиг" busy={create.isPending} onSubmit={(d) => create.mutate(d)} initial={{
+        <ClientForm key={settings.dataUpdatedAt} servers={servers.data} submitLabel="Создать и выдать конфиг" busy={create.isPending} onSubmit={(d) => create.mutate(d)} initial={{
           quota_bytes: settings.data?.default_quota_gb ? Number(settings.data.default_quota_gb) * 1024 ** 3 : null,
           expires_at: settings.data?.default_valid_days ? new Date(Date.now() + Number(settings.data.default_valid_days) * 86400000).toISOString() : null,
         }} />

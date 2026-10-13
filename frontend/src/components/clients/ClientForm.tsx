@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from "react";
 import clsx from "clsx";
 import type { ClientInput } from "@/lib/api";
-import type { VpnClient } from "@/lib/types";
-import { Field } from "@/components/ui/Primitives";
+import type { ServerKind, VpnClient, VpnServer } from "@/lib/types";
+import { Field, Segmented } from "@/components/ui/Primitives";
 import { NumberInput } from "@/components/ui/Controls";
 
 const GB = 1024 ** 3;
@@ -16,9 +16,11 @@ function toLocalInput(iso: string | null | undefined) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
-export default function ClientForm({ initial, submitLabel, busy, onSubmit }: {
-  initial?: Partial<VpnClient>; submitLabel: string; busy?: boolean; onSubmit: (d: ClientInput) => void;
+export default function ClientForm({ initial, submitLabel, busy, onSubmit, servers }: {
+  initial?: Partial<VpnClient>; submitLabel: string; busy?: boolean; onSubmit: (d: ClientInput) => void; servers?: VpnServer[];
 }) {
+  const [server, setServer] = useState<ServerKind>("amnezia");
+  const current = servers?.find((s) => s.kind === server);
   const [name, setName] = useState(initial?.name ?? "");
   const [owner, setOwner] = useState(initial?.owner ?? "");
   const [contact, setContact] = useState(initial?.contact ?? "");
@@ -36,11 +38,18 @@ export default function ClientForm({ initial, submitLabel, busy, onSubmit }: {
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       expires_at: expires ? new Date(expires).toISOString() : null,
       quota_gb: quota ? Number(quota) : null,
+      ...(servers ? { server } : {}),
     });
   };
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {servers && servers.length > 1 && (
+        <Field label="VPN-сервер" hint={current && !current.ready ? "WireGuard на MikroTik не настроен — настройте его на странице «VPN на MikroTik»" : server === "mikrotik" ? "WireGuard на домашнем роутере: доступ к локальной сети и сайты из списка через Amnezia" : "AmneziaWG на VPS с обфускацией трафика"}>
+          <Segmented layoutId="client-server" value={server} onChange={setServer}
+            options={servers.map((s) => ({ value: s.kind, label: s.title }))} />
+        </Field>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Имя *"><input className="input" required autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="iPhone Анны" /></Field>
         <Field label="Владелец"><input className="input" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Анна" /></Field>
@@ -61,7 +70,7 @@ export default function ClientForm({ initial, submitLabel, busy, onSubmit }: {
           onChange={(v) => setQuota(v === null ? "" : String(v))} />
       </Field>
       <Field label="Заметка"><textarea className="input min-h-[70px]" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-      <div className="flex justify-end"><button className="btn-primary" disabled={busy || !name.trim()}>{submitLabel}</button></div>
+      <div className="flex justify-end"><button className="btn-primary" disabled={busy || !name.trim() || (current && !current.ready)}>{submitLabel}</button></div>
     </form>
   );
 }

@@ -18,7 +18,7 @@ CH_URL = os.environ.get("CLICKHOUSE_URL", "http://clickhouse:8123")
 CH_USER = os.environ.get("CLICKHOUSE_USER", "amnezia")
 CH_PASSWORD = os.environ.get("CLICKHOUSE_PASSWORD", "")
 CH_DB = os.environ.get("CLICKHOUSE_DB", "flows")
-LAN = ipaddress.ip_network(os.environ.get("LAN_CIDR", "192.168.0.0/24"))
+LAN = [ipaddress.ip_network(n.strip()) for n in os.environ.get("LAN_CIDR", "192.168.0.0/24").split(",") if n.strip()]
 GATEWAY = os.environ.get("GATEWAY_IP", "192.168.0.210")
 VPN_HOST = os.environ.get("AWG_HOST", "")
 GEO_DIR = os.environ.get("GEOIP_DIR", "/data")
@@ -27,6 +27,10 @@ BATCH = int(os.environ.get("BATCH_SIZE", "5000"))
 FLUSH_SECONDS = float(os.environ.get("FLUSH_SECONDS", "5"))
 PROTOCOLS = {"ICMP": 1, "TCP": 6, "UDP": 17, "GRE": 47, "ESP": 50, "AH": 51, "SCTP": 132}
 DATABASES = {"city": "dbip-city-lite", "asn": "dbip-asn-lite"}
+
+
+def is_local(addr) -> bool:
+    return any(addr in n for n in LAN)
 
 
 class GeoEnricher:
@@ -100,7 +104,7 @@ class Classifier:
         if not src or not dst or ":" in src or ":" in dst:
             return None
         s, d = ipaddress.ip_address(src), ipaddress.ip_address(dst)
-        if s in LAN and d in LAN:
+        if is_local(s) and is_local(d):
             return None
         if VPN_HOST and VPN_HOST in (src, dst):
             return None
@@ -109,12 +113,12 @@ class Classifier:
         proto = pick(flow, "proto", "Proto", default=0)
         proto = PROTOCOLS.get(str(proto).upper(), proto) if not str(proto).isdigit() else int(proto)
         sport, dport = int(pick(flow, "src_port", "SrcPort", default=0)), int(pick(flow, "dst_port", "DstPort", default=0))
-        if s in LAN:
+        if is_local(s):
             direction, local, remote, lport, rport = "out", src, dst, sport, dport
             route = "vpn" if pick(flow, "next_hop", "NextHop", default="") == GATEWAY else "direct"
         else:
             direction, local, remote, lport, rport = "in", dst, src, dport, sport
-            route = "vpn" if d in LAN else "direct"
+            route = "vpn" if is_local(d) else "direct"
         country, asn, org = self._geo.lookup(remote)
         rate = int(pick(flow, "sampling_rate", "SamplingRate", default=1) or 1)
         received = int(pick(flow, "time_received_ns", "TimeReceivedNs", default=0)) // 1_000_000_000 \

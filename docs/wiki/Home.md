@@ -14,6 +14,7 @@ sites from a list go through the tunnel, the rest of the traffic goes directly t
 | [[MikroTik]] | Policy routing, fallback route, NetFlow, rollback |
 | [[Configuration]] | `.env` variables and in-panel settings |
 | [[Clients]] | VPN client lifecycle, quotas, expiry, config delivery |
+| [[MikroTik-VPN]] | WireGuard server on MikroTik: setup, clients, configs |
 | [[Monitoring]] | Dashboard, analytics, map, alerts, notifications, Telegram |
 | [[Flows]] | Flow analytics: ClickHouse, dimensions, filter language, examples |
 | [[Routing]] | Site list, custom prefixes, route check |

@@ -20,6 +20,9 @@ DEFAULTS = {
     "notify_telegram_chat_id": "",
     "backup_enabled": True,
     "backup_keep": 14,
+    "mt_endpoint_host": "",
+    "mt_client_dns": "",
+    "mt_allowed_ips": "0.0.0.0/0",
 }
 
 

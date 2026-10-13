@@ -8,6 +8,7 @@ from .adapters.clickhouse import ClickHouseClient
 from .services.flows import FlowService
 from .adapters.geoip import DbIpGeoLocator
 from .adapters.mikrotik import MikrotikSshRouter
+from .adapters.mikrotik_wg import MikrotikWireguard
 from .adapters.openbao import OpenBaoSecretStore
 from .adapters.ssh import SshKeyProvider, SshRunner
 from .adapters.telegram import TelegramNotifier
@@ -18,6 +19,7 @@ from .services.alerts import AlertService
 from .services.analytics import AnalyticsService
 from .services.audit import AuditService
 from .services.auth import AuthService
+from .services.backends import AmneziaBackend, MikrotikBackend
 from .services.backups import BackupService
 from .services.clients import VpnClientService
 from .services.configs import ClientConfigBuilder
@@ -34,6 +36,7 @@ from .workers import PeriodicJob, Scheduler
 
 log = logging.getLogger(__name__)
 STARTUP_LOCK_KEY = 7_331_003
+MT_LOCK_KEY = 7_331_004
 
 
 class Container:
@@ -49,7 +52,9 @@ class Container:
         known_hosts = os.path.join(cfg.data_dir, "known_hosts")
         self.vpn_gateway = AmneziaDockerGateway(SshRunner(cfg.awg_host, cfg.awg_ssh_user, keys, known_hosts),
                                                 cfg.awg_container, cfg.awg_dir, cfg.awg_iface, cfg.awg_bin)
-        self.router = MikrotikSshRouter(SshRunner(cfg.router_host, cfg.router_ssh_user, keys, known_hosts))
+        router_ssh = SshRunner(cfg.router_host, cfg.router_ssh_user, keys, known_hosts)
+        self.router = MikrotikSshRouter(router_ssh)
+        self.mikrotik_wg = MikrotikWireguard(router_ssh, cfg.mt_wg_iface, cfg.mt_wg_network, cfg.mt_wg_port)
         self.geo = DbIpGeoLocator(cfg.geoip_dir)
 
         self.settings = SettingsService(self.db)
@@ -63,10 +68,13 @@ class Container:
         self.users = PanelUserService(self.db, self.auth, self.audit)
         self.editor = ServerConfigEditor(self.vpn_gateway, DistributedLock(dsn, CONFIG_LOCK_KEY))
         self.server = ServerService(self.db, self.editor, self.audit)
-        self.clients = VpnClientService(self.db, self.editor, self.vpn_gateway, self.secrets,
-                                        ClientConfigBuilder(cfg.awg_container), self.settings, self.audit, self.bus,
-                                        cfg.awg_host, cfg.public_base_url, self.live)
-        self.collector = TrafficCollector(self.db, self.vpn_gateway, self.clients, self.geo, self.alerts, self.bus)
+        self.amnezia = AmneziaBackend(self.editor, self.vpn_gateway, ClientConfigBuilder(cfg.awg_container),
+                                      self.settings, cfg.awg_host)
+        self.mikrotik = MikrotikBackend(self.mikrotik_wg, self.settings, DistributedLock(dsn, MT_LOCK_KEY), cfg.lan_cidr)
+        backends = [self.amnezia, self.mikrotik]
+        self.clients = VpnClientService(self.db, backends, self.secrets, self.settings, self.audit, self.bus,
+                                        cfg.public_base_url, self.live)
+        self.collector = TrafficCollector(self.db, backends, self.clients, self.geo, self.alerts, self.bus)
         self.analytics = AnalyticsService(self.db, self.live, self.alerts, self.settings, self.geo, cfg.awg_host)
         self.policy = PolicyEnforcer(self.db, self.clients, self.alerts, self.settings)
         self.health = HealthMonitor(self.db, self.secrets, self.alerts, self.settings)

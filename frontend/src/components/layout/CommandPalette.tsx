@@ -9,7 +9,7 @@ import { StatusDot } from "@/components/ui/Primitives";
 
 const PAGES = [
   { label: "Обзор", to: "/" }, { label: "Клиенты VPN", to: "/clients" }, { label: "Аналитика", to: "/analytics" },
-  { label: "Карта подключений", to: "/map" }, { label: "Анализ потоков", to: "/flows" }, { label: "Резервные копии", to: "/backups" }, { label: "Алерты", to: "/alerts" }, { label: "Маршрутизация", to: "/routing" },
+  { label: "Карта подключений", to: "/map" }, { label: "Анализ потоков", to: "/flows" }, { label: "Резервные копии", to: "/backups" }, { label: "Алерты", to: "/alerts" }, { label: "Маршрутизация", to: "/routing" }, { label: "VPN на MikroTik", to: "/mikrotik-vpn" },
   { label: "Сервер AWG", to: "/server" }, { label: "Журнал аудита", to: "/audit" }, { label: "Настройки", to: "/settings" },
   { label: "Профиль и безопасность", to: "/profile" },
 ];

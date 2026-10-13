@@ -16,6 +16,9 @@
 | `LAN_CIDR` | `192.168.0.0/24` | Local network (used to classify flows) |
 | `LAN_IF` | `eth0` | LAN interface of the gateway host |
 | `TUNNEL_NET` | `10.8.1.0/24` | AmneziaWG tunnel network |
+| `MT_WG_IFACE` | `wg-ac` | WireGuard interface on MikroTik (see [[MikroTik-VPN]]) |
+| `MT_WG_NETWORK` | `10.9.0.0/24` | Network of MikroTik VPN clients; the first address belongs to the router |
+| `MT_WG_PORT` | `51820` | UDP port of the MikroTik WireGuard server |
 | `SSH_KEY_FILE` | `/root/.ssh/id_ed25519` | SSH key imported into OpenBao on first start |
 | `PUBLIC_BASE_URL` | `http://localhost:8080` | Panel URL (used in config share links) |
 | `PANEL_PORT` | `8080` | Panel port |
@@ -39,6 +42,7 @@
 | | Share link lifetime | For one-time config links |
 | Defaults | Default quota and access period | Pre-filled in the new client form |
 | | Quota warning threshold, days before expiry | For alerts |
+| VPN on MikroTik | Connection address, DNS, AllowedIPs | Set on the "VPN on MikroTik" page, see [[MikroTik-VPN]] |
 | Monitoring | Server polling interval | 10 s by default |
 | | Statistics retention | 90 days by default |
 | | "Gateway silent" threshold | Minutes without a handshake before an alert |

@@ -8,3 +8,7 @@
 /ip dhcp-client set [find interface=WAN] script=""
 /ip traffic-flow target remove [find port=2055]
 /ip traffic-flow set enabled=no
+/ip firewall filter remove [find comment~"^amnezia: wireguard"]
+/ip address remove [find comment="amnezia-control"]
+/interface wireguard peers remove [find interface=wg-ac]
+/interface wireguard remove [find name=wg-ac]

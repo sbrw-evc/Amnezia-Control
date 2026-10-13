@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import ipaddress
+import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
@@ -18,6 +19,18 @@ from .common import Actor
 
 SERVER_ONLY = {"PrivateKey", "Address", "ListenPort", "PostUp", "PostDown", "PreUp", "PreDown",
                "SaveConfig", "Table", "FwMark", "MTU", "DNS"}
+
+
+def free_address(network: ipaddress.IPv4Network, taken: list[str]) -> str:
+    used = {ipaddress.ip_interface(a.strip()).ip for item in taken for a in item.split(",") if a.strip()}
+    for ip in network.hosts():
+        if ip not in used:
+            return f"{ip}/32"
+    raise DomainError(f"Нет свободных адресов в {network}")
+
+
+def generate_psk() -> str:
+    return base64.b64encode(os.urandom(32)).decode()
 
 
 def generate_keypair() -> KeyPair:
@@ -49,15 +62,8 @@ class ServerConfig:
         return next((p for p in self.peers if p.public_key == public_key), None)
 
     def free_address(self) -> str:
-        used = {ipaddress.ip_interface(self.params["Address"].split(",")[0].strip()).ip}
-        for p in self.peers:
-            for a in p.address.split(","):
-                if a.strip():
-                    used.add(ipaddress.ip_interface(a.strip()).ip)
-        for ip in self.network.hosts():
-            if ip not in used:
-                return f"{ip}/32"
-        raise DomainError(f"Нет свободных адресов в {self.network}")
+        server_ip = ipaddress.ip_interface(self.params["Address"].split(",")[0].strip()).ip
+        return free_address(self.network, [str(server_ip)] + [p.address for p in self.peers])
 
 
 class ServerConfigEditor:

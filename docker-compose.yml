@@ -81,7 +81,7 @@ services:
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_USER: amnezia
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
-      LAN_CIDR: ${LAN_CIDR:-192.168.0.0/24}
+      LAN_CIDR: ${LAN_CIDR:-192.168.0.0/24},${MT_WG_NETWORK:-10.9.0.0/24}
       GATEWAY_IP: ${GATEWAY_IP:-192.168.0.210}
       AWG_HOST: ${AWG_HOST}
     ports: ["${FLOW_PORT:-2055}:2055/udp"]

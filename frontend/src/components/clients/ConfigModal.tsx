@@ -15,6 +15,7 @@ export default function ConfigModal({ clientId, onClose }: { clientId: string | 
   const [link, setLink] = useState<{ url: string; expires_at: string } | null>(null);
   const q = useQuery({ queryKey: ["bundle", clientId], queryFn: () => api.clients.bundle(clientId!), enabled: !!clientId, staleTime: 0, gcTime: 0,
     refetchInterval: false, refetchOnWindowFocus: false });
+  const hasKey = !!q.data?.amnezia_key;
   const share = useAction((hours: number) => api.clients.share(clientId!, hours), { onSuccess: (r) => { setLink(r); copyText(r.url, "Ссылка скопирована"); } });
 
   return (
@@ -26,7 +27,7 @@ export default function ConfigModal({ clientId, onClose }: { clientId: string | 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Segmented layoutId="cfg-tab" value={tab} onChange={setTab} options={[
               { value: "qr", label: <span className="flex items-center gap-1"><QrCode size={12} /> QR</span> },
-              { value: "conf", label: ".conf" }, { value: "key", label: "vpn://" },
+              { value: "conf", label: ".conf" }, ...(hasKey ? [{ value: "key" as Tab, label: "vpn://" }] : []),
             ]} />
             <div className="flex gap-2">
               <a className="btn-ghost btn-sm" href={api.clients.downloadUrl(clientId!)}><Download size={14} /> Скачать .conf</a>
@@ -45,9 +46,15 @@ export default function ConfigModal({ clientId, onClose }: { clientId: string | 
               <div className="grid items-center gap-5 sm:grid-cols-[260px_1fr]">
                 <div className="qr" dangerouslySetInnerHTML={{ __html: q.data.qr_svg }} />
                 <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-300">
-                  <li>Установите <b>AmneziaWG</b> (iOS / Android / Windows / macOS).</li>
-                  <li>Нажмите «+» → «Сканировать QR-код» и наведите камеру.</li>
-                  <li>Или используйте вкладку <b>vpn://</b> для приложения <b>Amnezia VPN</b>.</li>
+                  {hasKey ? <>
+                    <li>Установите <b>AmneziaWG</b> (iOS / Android / Windows / macOS).</li>
+                    <li>Нажмите «+» → «Сканировать QR-код» и наведите камеру.</li>
+                    <li>Или используйте вкладку <b>vpn://</b> для приложения <b>Amnezia VPN</b>.</li>
+                  </> : <>
+                    <li>Установите <b>WireGuard</b> или <b>Amnezia VPN</b> (iOS / Android / Windows / macOS).</li>
+                    <li>WireGuard: «+» → «Сканировать QR-код». Amnezia VPN: «+» → «QR-код» или «Файл с настройками» (.conf).</li>
+                    <li>Подключение идёт на домашний MikroTik: доступна локальная сеть, сайты из списка — через Amnezia.</li>
+                  </>}
                 </ol>
               </div>
             )}

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from .domain.models import GeoPoint, PeerEntry, PeerRuntime
+from .domain.models import ClientBundle, GeoPoint, NewPeer, PeerEntry, PeerRuntime
 
 
 class SecretStore(ABC):
@@ -93,3 +93,40 @@ class ConfigCodec(ABC):
 
     @abstractmethod
     def render(self, interface_lines: list[str], peers: list[PeerEntry]) -> str: ...
+
+
+class VpnBackend(ABC):
+    kind: str
+    title: str
+    alert_key: str
+
+    @abstractmethod
+    async def ready(self) -> bool: ...
+
+    @abstractmethod
+    async def runtime(self) -> dict[str, PeerRuntime]: ...
+
+    @abstractmethod
+    async def peers(self) -> list[PeerEntry]: ...
+
+    @abstractmethod
+    async def names(self) -> dict[str, str]: ...
+
+    @abstractmethod
+    async def add_peer(self, public_key: str, name: str) -> NewPeer: ...
+
+    @abstractmethod
+    async def rename_peer(self, public_key: str, name: str, address: str) -> None: ...
+
+    @abstractmethod
+    async def set_disabled(self, public_key: str, disabled: bool) -> None: ...
+
+    @abstractmethod
+    async def rekey_peer(self, old_key: str, new_key: str) -> None: ...
+
+    @abstractmethod
+    async def remove_peer(self, public_key: str) -> None: ...
+
+    @abstractmethod
+    async def bundle(self, *, name: str, private_key: str, public_key: str, address: str,
+                     preshared_key: str | None) -> ClientBundle: ...

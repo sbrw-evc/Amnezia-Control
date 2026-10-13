@@ -8,6 +8,7 @@
 
 **Usage**
 - [[VPN clients|Clients]]
+- [[VPN on MikroTik|MikroTik-VPN]]
 - [[Monitoring and alerts|Monitoring]]
 - [[Flow analytics|Flows]]
 - [[Routing]]
@@ -28,6 +29,7 @@
 - [[Настройка MikroTik|ru-MikroTik]]
 - [[Конфигурация|ru-Configuration]]
 - [[Клиенты VPN|ru-Clients]]
+- [[VPN на MikroTik|ru-MikroTik-VPN]]
 - [[Мониторинг и алерты|ru-Monitoring]]
 - [[Анализ потоков|ru-Flows]]
 - [[Маршрутизация|ru-Routing]]

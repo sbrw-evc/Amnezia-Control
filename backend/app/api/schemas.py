@@ -28,6 +28,7 @@ class ClientIn(BaseModel):
     note: str = ""
     expires_at: dt.datetime | None = None
     quota_gb: float | None = Field(default=None, ge=0)
+    server: str = Field(default="amnezia", pattern="^(amnezia|mikrotik)$")
 
 
 class ClientPatch(BaseModel):

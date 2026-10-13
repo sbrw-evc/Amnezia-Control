@@ -56,6 +56,7 @@ export default function ClientDetail() {
           <Badge tone={c.status === "active" ? "green" : c.status === "blocked" ? "red" : "amber"}>
             {STATUS_LABEL[c.status]}{c.block_reason && ` · ${REASON_LABEL[c.block_reason]}`}
           </Badge>
+          <Badge tone="blue">{c.server === "mikrotik" ? "MikroTik · WireGuard" : "Amnezia · AWG"}</Badge>
           {c.system && <Badge tone="violet">системный шлюз</Badge>}
           {!c.managed && <Badge tone="amber">ключ не в панели</Badge>}
           <span className="mono">{c.address}</span>
