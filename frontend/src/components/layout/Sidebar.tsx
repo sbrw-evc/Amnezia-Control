@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import {
   Activity, Archive, BarChart3, Waypoints, Bell, ChevronsLeft, FileClock, Globe2, LayoutDashboard, LogOut, Network, Server,
-  Router, Settings, Shield, Users, UserCog,
+  Router, Settings, Shield, Users, UserCog, Share2, MonitorSmartphone, HardDrive,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
@@ -35,10 +35,15 @@ export default function Sidebar({ collapsed, onToggle, onNavigate, onNotificatio
       { to: "/", label: "Обзор", icon: <LayoutDashboard size={18} /> },
       { to: "/analytics", label: "Аналитика", icon: <BarChart3 size={18} /> },
       { to: "/flows", label: "Анализ потоков", icon: <Waypoints size={18} /> },
-      { to: "/map", label: "Карта подключений", icon: <Globe2 size={18} /> },
+      { to: "/network-map", label: "Карта сети", icon: <Share2 size={18} /> },
+      { to: "/map", label: "Карта подключений VPN", icon: <Globe2 size={18} /> },
       { to: "/alerts", label: "Алерты", icon: <Bell size={18} />, badge: alerts.total },
     ] },
-    { title: "Управление", items: [
+    { title: "Сеть", items: [
+      { to: "/devices", label: "Устройства", icon: <HardDrive size={18} /> },
+      { to: "/endpoints", label: "Клиенты сети", icon: <MonitorSmartphone size={18} /> },
+    ] },
+    { title: "VPN", items: [
       { to: "/clients", label: "Клиенты VPN", icon: <Users size={18} /> },
       { to: "/mikrotik-vpn", label: "VPN на MikroTik", icon: <Router size={18} /> },
       { to: "/routing", label: "Маршрутизация", icon: <Network size={18} /> },
@@ -61,8 +66,8 @@ export default function Sidebar({ collapsed, onToggle, onNavigate, onNotificatio
         </motion.div>
         {!collapsed && (
           <motion.div initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} className="min-w-0">
-            <div className="flex items-center gap-2 font-semibold leading-tight text-white">Amnezia Control</div>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500">VPN control center <span className="rounded bg-orange-500/90 px-1 text-[9px] font-bold uppercase text-white">AWG</span></div>
+            <div className="flex items-center gap-2 font-semibold leading-tight text-white">Network Control</div>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500">Network &amp; VPN control <span className="rounded bg-orange-500/90 px-1 text-[9px] font-bold uppercase text-white">AWG</span></div>
           </motion.div>
         )}
       </div>

@@ -17,7 +17,7 @@ Lockout protection: the last administrator cannot be deleted or demoted, and use
 - Sessions are random tokens in an httpOnly `SameSite=Strict` cookie; only the SHA-256 is stored in the database. Sessions can be listed and revoked in the profile.
 - Changing the password ends all other sessions. New operators and reset passwords must be changed at sign-in.
 - 2FA (TOTP) — the secret is stored in OpenBao; an administrator can disable 2FA for a user.
-- CSRF — state-changing requests require the `X-Requested-With: amnezia-control` header.
+- CSRF — state-changing requests require the `X-Requested-With: network-control` header.
 - Password fields have a show/hide button.
 
 ## API tokens

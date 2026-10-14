@@ -23,6 +23,16 @@ DEFAULTS = {
     "mt_endpoint_host": "",
     "mt_client_dns": "",
     "mt_allowed_ips": "0.0.0.0/0",
+    "endpoint_offline_minutes": 15,
+    "endpoint_retention_days": 90,
+    "flow_collector_host": "",
+    "flow_collector_port": 2055,
+    "threat_enabled": True,
+    "threat_refresh_hours": 6,
+    "threat_lists": None,
+    "threat_exclude": "",
+    "rdns_enabled": True,
+    "threat_status": None,
 }
 
 

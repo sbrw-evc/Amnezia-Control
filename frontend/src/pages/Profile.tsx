@@ -73,7 +73,7 @@ export default function Profile() {
       </div>
 
       <Card title={<span className="flex items-center gap-2"><Monitor size={14} /> Активные сессии</span>} bodyClass="p-0">
-        <table className="table-ac">
+        <table className="table-nc">
           <thead><tr><th>Устройство</th><th>IP</th><th>Создана</th><th>Активность</th><th /></tr></thead>
           <tbody>
             {sessions.data?.map((s) => (

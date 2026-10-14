@@ -82,7 +82,7 @@ export default function Routing() {
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card title="Маршруты таблицы to-vpn" bodyClass="p-0">
-          <table className="table-ac">
+          <table className="table-nc">
             <thead><tr><th>Шлюз</th><th>Дистанция</th><th>Состояние</th></tr></thead>
             <tbody>
               {(r?.routes ?? []).map((rt) => (

@@ -36,6 +36,6 @@ fi
 docker compose pull --ignore-pull-failures --quiet || true
 docker compose up -d
 echo
-echo "Amnezia Control is running: $(sed -n 's/^PUBLIC_BASE_URL=//p' .env)"
+echo "Network Control is running: $(sed -n 's/^PUBLIC_BASE_URL=//p' .env)"
 echo "Login: $(sed -n 's/^INITIAL_ADMIN_USER=//p' .env), password: INITIAL_ADMIN_PASSWORD from .env (you will be asked to change it)"
 echo "Back up openbao/keys/unseal.key and data/bao-init/init.json to a safe place."

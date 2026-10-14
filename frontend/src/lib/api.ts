@@ -2,6 +2,8 @@ import type {
   Alert, ApiTokenInfo, AuditItem, BackupItem, CustomPrefix, FlowField, FlowOverview, FlowQuery, FlowRecord, FlowResult,
   FlowStatus, RouteCheck, SavedFilter, ClientBundle, GeoData, HeatCell, LivePoint, PanelUser, Range, RouterStatus, SeriesPoint,
   MikrotikVpnInfo, ServerInfo, ServerKind, Session, Settings, SiteListSummary, Summary, TopRow, VpnClient, VpnServer,
+  DeviceAction, DevicePlatform, DiscoveryResult, FlowExporter, FlowRule, FlowRuleKind, NetworkDevice, NetworkEndpoint,
+  SavedView, ThreatInfo, Topology,
 } from "./types";
 
 export class ApiError extends Error {
@@ -26,7 +28,7 @@ export class HttpClient {
   }
 
   async request<T>(method: string, path: string, opts: { body?: unknown; query?: Query; form?: FormData; silent401?: boolean } = {}): Promise<T> {
-    const headers: Record<string, string> = { "X-Requested-With": "amnezia-control" };
+    const headers: Record<string, string> = { "X-Requested-With": "network-control" };
     let body: BodyInit | undefined;
     if (opts.form) body = opts.form;
     else if (opts.body !== undefined) {
@@ -158,6 +160,41 @@ export class FlowsApi extends Resource {
   filters() { return this.http.get<SavedFilter[]>("/api/flows/filters"); }
   saveFilter(name: string, filter: string, shared: boolean) { return this.http.post<{ id: number }>("/api/flows/filters", { name, filter, shared }); }
   deleteFilter(id: number) { return this.http.delete(`/api/flows/filters/${id}`); }
+  exporters() { return this.http.get<FlowExporter[]>("/api/flows/exporters"); }
+  ruleKinds() { return this.http.get<FlowRuleKind[]>("/api/flows/rules/kinds"); }
+  rules() { return this.http.get<FlowRule[]>("/api/flows/rules"); }
+  createRule(d: Partial<FlowRule>) { return this.http.post<FlowRule>("/api/flows/rules", d); }
+  updateRule(id: number, d: Partial<FlowRule>) { return this.http.patch<FlowRule>(`/api/flows/rules/${id}`, d); }
+  deleteRule(id: number) { return this.http.delete(`/api/flows/rules/${id}`); }
+  testRule(id: number) { return this.http.post<{ group: string; label: string; value: number; text: string; link?: string }[]>(`/api/flows/rules/${id}/test`); }
+  threats(hours = 24) { return this.http.get<ThreatInfo>("/api/flows/threats", { hours }); }
+  refreshThreats() { return this.http.post<{ prefixes: number }>("/api/flows/threats/refresh"); }
+  views() { return this.http.get<SavedView[]>("/api/flows/views"); }
+  saveView(name: string, state: Record<string, unknown>, shared = true) { return this.http.post<{ id: number }>("/api/flows/views", { name, state, shared }); }
+  deleteView(id: number) { return this.http.delete(`/api/flows/views/${id}`); }
+}
+
+export type DeviceInput = Partial<Omit<NetworkDevice, "credentials">> & { credentials?: Record<string, string | null>; clear_credentials?: string[] };
+
+export class DevicesApi extends Resource {
+  platforms() { return this.http.get<DevicePlatform[]>("/api/devices/platforms"); }
+  list() { return this.http.get<NetworkDevice[]>("/api/devices"); }
+  get(id: string) { return this.http.get<NetworkDevice>(`/api/devices/${id}`); }
+  create(d: DeviceInput) { return this.http.post<NetworkDevice>("/api/devices", d); }
+  update(id: string, d: DeviceInput) { return this.http.patch<NetworkDevice>(`/api/devices/${id}`, d); }
+  remove(id: string) { return this.http.delete(`/api/devices/${id}`); }
+  test(d: DeviceInput & { id?: string }) { return this.http.post<{ ok: boolean; facts: Record<string, unknown>; interfaces: number; neighbors: number; endpoints: number; children: number }>("/api/devices/test", d); }
+  poll(id: string) { return this.http.post<{ ok: boolean; error: string }>(`/api/devices/${id}/poll`); }
+  action(id: string, action: DeviceAction, params: Record<string, unknown> = {}) { return this.http.post<{ ok: boolean; output: string }>(`/api/devices/${id}/actions`, { action, params }); }
+  backupUrl(id: string) { return `/api/devices/${id}/backup`; }
+  resetHostKey(id: string) { return this.http.post(`/api/devices/${id}/reset-host-key`); }
+  discover(target: string, community = "public") { return this.http.post<DiscoveryResult[]>("/api/devices/discover", { target, community }); }
+  endpoints(q?: { q?: string; online?: boolean; device_id?: string }) { return this.http.get<NetworkEndpoint[]>("/api/endpoints", q); }
+  updateEndpoint(mac: string, d: { alias?: string; note?: string }) { return this.http.patch<NetworkEndpoint>(`/api/endpoints/${encodeURIComponent(mac)}`, d); }
+  forgetEndpoint(mac: string) { return this.http.delete(`/api/endpoints/${encodeURIComponent(mac)}`); }
+  blockEndpoint(mac: string, blocked: boolean) { return this.http.post<{ ok: boolean; output: string }>(`/api/endpoints/${encodeURIComponent(mac)}/block`, { blocked }); }
+  topology(offline = false, endpoints = true) { return this.http.get<Topology>("/api/topology", { offline, endpoints }); }
+  savePositions(p: Record<string, [number, number] | null>) { return this.http.put("/api/topology/positions", p); }
 }
 
 export class ApiClient {
@@ -169,6 +206,7 @@ export class ApiClient {
   readonly users = new UsersApi(this.http);
   readonly admin = new AdminApi(this.http);
   readonly flows = new FlowsApi(this.http);
+  readonly devices = new DevicesApi(this.http);
 }
 
 export const api = new ApiClient();

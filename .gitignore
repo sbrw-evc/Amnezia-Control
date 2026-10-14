@@ -9,3 +9,5 @@ __pycache__/
 *.tgz
 .DS_Store
 
+.pytest_cache/
+*.tsbuildinfo

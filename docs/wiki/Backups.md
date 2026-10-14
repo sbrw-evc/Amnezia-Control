@@ -2,7 +2,7 @@
 
 ## What the archive contains
 
-`data/backend/backups/amnezia-control-YYYYMMDD-HHMMSS.tar.gz`:
+`data/backend/backups/network-control-YYYYMMDD-HHMMSS.tar.gz`:
 
 | File | Contents |
 |---|---|
@@ -27,18 +27,18 @@ Keep `openbao/keys/unseal.key`, `data/bao-init/init.json` and `.env` separately.
 3. Restore OpenBao:
 
    ```bash
-   tar xzf amnezia-control-*.tar.gz openbao.snap
-   docker cp openbao.snap ac-openbao:/tmp/
+   tar xzf network-control-*.tar.gz openbao.snap
+   docker cp openbao.snap nc-openbao:/tmp/
    docker exec -e BAO_ADDR=http://127.0.0.1:8200 \
      -e BAO_TOKEN=$(sed -n 's/.*"root_token": *"\([^"]*\)".*/\1/p' data/bao-init/init.json) \
-     ac-openbao bao operator raft snapshot restore -force /tmp/openbao.snap
+     nc-openbao bao operator raft snapshot restore -force /tmp/openbao.snap
    ```
 
 4. Restore the database (tables are truncated and refilled from the archive):
 
    ```bash
-   cp amnezia-control-*.tar.gz data/backend/backups/
-   docker compose run --rm backend python -m app.cli restore-db /data/backups/amnezia-control-YYYYMMDD-HHMMSS.tar.gz
+   cp network-control-*.tar.gz data/backend/backups/
+   docker compose run --rm backend python -m app.cli restore-db /data/backups/network-control-YYYYMMDD-HHMMSS.tar.gz
    ```
 
 5. Start the remaining services: `docker compose up -d`.

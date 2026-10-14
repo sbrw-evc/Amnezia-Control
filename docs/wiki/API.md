@@ -4,7 +4,7 @@ Interactive OpenAPI documentation: `/api/docs` (schema — `/api/openapi.json`).
 
 ## Authentication
 
-- **Browser** — session cookie + the `X-Requested-With: amnezia-control` header for state-changing requests.
+- **Browser** — session cookie + the `X-Requested-With: network-control` header for state-changing requests.
 - **Integrations** — an API token: `Authorization: Bearer ac_…` (the role is set when the token is issued).
 
 ```bash
@@ -35,6 +35,20 @@ curl -H "Authorization: Bearer $TOKEN" http://<panel>/api/analytics/summary
 | GET/PUT | `/api/settings` | viewer / administrator | Settings |
 | GET | `/api/alerts` · `/api/audit` | viewer / administrator | Alerts, audit |
 | GET | `/api/events` | viewer | Server-Sent Events |
+| GET | `/api/devices/platforms` | viewer | Supported platforms, transports, credentials and capabilities |
+| GET/POST | `/api/devices` | viewer / administrator | Device list, add a device (`credentials` go to OpenBao) |
+| GET/PATCH/DELETE | `/api/devices/{id}` | viewer / administrator | Details with interfaces, neighbours, children and clients; update; delete |
+| POST | `/api/devices/test` · `/discover` | administrator | Test unsaved parameters; probe an address or subnet |
+| POST | `/api/devices/{id}/poll` | operator | Poll now |
+| POST | `/api/devices/{id}/actions` | operator / administrator | `{"action": "hostname|interface|dns|ntp|flow_export|reboot|endpoint_block|command", "params": {…}}` |
+| GET | `/api/devices/{id}/backup` | administrator | Running configuration as text |
+| GET | `/api/endpoints` | viewer | Network clients (`q`, `online`, `device_id`) |
+| PATCH/DELETE | `/api/endpoints/{mac}` · POST `/block` | operator | Name and note, forget, block on the controller |
+| GET · PUT | `/api/topology` · `/api/topology/positions` | viewer · operator | Network map graph; saved device positions |
+| GET | `/api/flows/exporters` | viewer | Exporters and their interfaces |
+| GET/POST/PATCH/DELETE | `/api/flows/rules` · POST `/rules/{id}/test` | viewer / administrator | Detection rules |
+| GET · POST | `/api/flows/threats` · `/threats/refresh` | viewer · administrator | Threat contacts and lists |
+| GET/POST/DELETE | `/api/flows/views` | viewer | Saved visualization views |
 
 ### Example: flow visualization
 
@@ -55,6 +69,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 | `alert` | A new or resolved alert |
 | `audit` | A new audit entry |
 | `connection` | A new client connection (city, country) |
+| `devices` | A device was added, changed, deleted or polled (`id`, `action`, `status`) |
 
 ## Errors
 

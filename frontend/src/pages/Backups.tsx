@@ -25,7 +25,7 @@ export default function Backups() {
           Без этого ключа восстановить секреты невозможно — храните его отдельно от архивов. Порядок восстановления описан в Wiki.</div>
       </div>
       <Card bodyClass="p-0">
-        <table className="table-ac">
+        <table className="table-nc">
           <thead><tr><th>Архив</th><th>Создан</th><th>Размер</th><th /></tr></thead>
           <tbody ref={rows}>
             {list.isLoading && <tr><td colSpan={4}><Skeleton className="h-24" /></td></tr>}

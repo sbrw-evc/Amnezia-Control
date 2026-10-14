@@ -1,10 +1,10 @@
-name: amnezia-control
+name: network-control
 
 services:
   awg-client:
     build: ./awg-client
-    image: ghcr.io/sbrw-evc/amnezia-control-awg-client:${AC_VERSION:-1.0.0}
-    container_name: ac-awg-client
+    image: ghcr.io/sbrw-evc/network-control-awg-client:${NC_VERSION:-2.0.0}
+    container_name: nc-awg-client
     network_mode: host
     cap_add: [NET_ADMIN]
     devices: ["/dev/net/tun:/dev/net/tun"]
@@ -16,7 +16,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: ac-postgres
+    container_name: nc-postgres
     environment:
       POSTGRES_DB: amnezia
       POSTGRES_USER: amnezia
@@ -31,7 +31,7 @@ services:
 
   openbao:
     image: openbao/openbao:${OPENBAO_VERSION:-2.6.2}
-    container_name: ac-openbao
+    container_name: nc-openbao
     command: ["server", "-config=/openbao/config/config.hcl"]
     cap_add: [IPC_LOCK]
     volumes:
@@ -43,7 +43,7 @@ services:
 
   bao-init:
     image: openbao/openbao:${OPENBAO_VERSION:-2.6.2}
-    container_name: ac-bao-init
+    container_name: nc-bao-init
     user: "0:0"
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
     volumes:
@@ -57,7 +57,7 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.8}
-    container_name: ac-clickhouse
+    container_name: nc-clickhouse
     environment:
       CLICKHOUSE_DB: flows
       CLICKHOUSE_USER: amnezia
@@ -66,8 +66,8 @@ services:
       TZ: UTC
     volumes:
       - ./data/clickhouse:/var/lib/clickhouse
-      - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/amnezia-control.xml:ro
-      - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/amnezia-control.xml:ro
+      - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/network-control.xml:ro
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/network-control.xml:ro
     ulimits:
       nofile: { soft: 262144, hard: 262144 }
     restart: unless-stopped
@@ -75,8 +75,8 @@ services:
 
   flow-collector:
     build: ./flow-collector
-    image: ghcr.io/sbrw-evc/amnezia-control-flow-collector:${AC_VERSION:-1.0.0}
-    container_name: ac-flow-collector
+    image: ghcr.io/sbrw-evc/network-control-flow-collector:${NC_VERSION:-2.0.0}
+    container_name: nc-flow-collector
     environment:
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_USER: amnezia
@@ -84,7 +84,9 @@ services:
       LAN_CIDR: ${LAN_CIDR:-192.168.0.0/24},${MT_WG_NETWORK:-10.9.0.0/24}
       GATEWAY_IP: ${GATEWAY_IP:-192.168.0.210}
       AWG_HOST: ${AWG_HOST}
-    ports: ["${FLOW_PORT:-2055}:2055/udp"]
+      ROUTER_HOST: ${ROUTER_HOST:-}
+      KEEP_INTERNAL: ${KEEP_INTERNAL:-1}
+    ports: ["${FLOW_PORT:-2055}:2055/udp", "${SFLOW_PORT:-6343}:6343/udp"]
     volumes: ["./data/geoip:/data"]
     depends_on: [clickhouse]
     restart: unless-stopped
@@ -92,8 +94,8 @@ services:
 
   backend:
     build: ./backend
-    image: ghcr.io/sbrw-evc/amnezia-control-backend:${AC_VERSION:-1.0.0}
-    container_name: ac-backend
+    image: ghcr.io/sbrw-evc/network-control-backend:${NC_VERSION:-2.0.0}
+    container_name: nc-backend
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://amnezia:${POSTGRES_PASSWORD}@postgres:5432/amnezia
@@ -112,8 +114,8 @@ services:
 
   frontend:
     build: ./frontend
-    image: ghcr.io/sbrw-evc/amnezia-control-frontend:${AC_VERSION:-1.0.0}
-    container_name: ac-frontend
+    image: ghcr.io/sbrw-evc/network-control-frontend:${NC_VERSION:-2.0.0}
+    container_name: nc-frontend
     ports: ["${PANEL_PORT:-8080}:80"]
     volumes: ["./data/tiles:/var/cache/nginx/tiles"]
     depends_on: [backend]

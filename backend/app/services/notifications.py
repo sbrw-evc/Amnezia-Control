@@ -34,7 +34,7 @@ class NotificationService:
     async def test(self) -> None:
         if not await self._notifier.configured():
             raise DomainError("Укажите токен бота и chat id")
-        await self._notifier.send("✅ <b>Amnezia Control</b>: тестовое уведомление")
+        await self._notifier.send("✅ <b>Network Control</b>: тестовое уведомление")
 
     async def _safe_send(self, text: str) -> None:
         try:

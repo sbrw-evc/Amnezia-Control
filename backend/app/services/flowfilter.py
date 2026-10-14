@@ -8,6 +8,31 @@ from ..domain.errors import DomainError
 
 PROTOCOLS = {"icmp": 1, "tcp": 6, "udp": 17, "gre": 47, "esp": 50, "ah": 51, "sctp": 132}
 SITES_DICT = "flows.sites"
+APPS = {
+    20: "FTP", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS", 67: "DHCP", 68: "DHCP", 69: "TFTP", 80: "HTTP",
+    110: "POP3", 123: "NTP", 137: "NetBIOS", 138: "NetBIOS", 139: "NetBIOS", 143: "IMAP", 161: "SNMP", 162: "SNMP",
+    179: "BGP", 389: "LDAP", 443: "HTTPS", 445: "SMB", 465: "SMTPS", 500: "IPsec", 514: "Syslog", 554: "RTSP",
+    587: "SMTP", 631: "IPP", 636: "LDAPS", 853: "DNS over TLS", 993: "IMAPS", 995: "POP3S", 1194: "OpenVPN",
+    1433: "MS SQL", 1701: "L2TP", 1723: "PPTP", 1883: "MQTT", 1935: "RTMP", 2055: "NetFlow", 3074: "Xbox Live",
+    3306: "MySQL", 3389: "RDP", 3478: "STUN / TURN", 3479: "STUN / TURN", 3544: "Teredo", 4500: "IPsec NAT-T",
+    5060: "SIP", 5061: "SIP TLS", 5222: "XMPP", 5223: "Apple Push", 5228: "Google Play", 5353: "mDNS", 5432: "PostgreSQL",
+    5900: "VNC", 6343: "sFlow", 6379: "Redis", 6881: "BitTorrent", 6889: "BitTorrent", 8080: "HTTP", 8291: "Winbox",
+    8443: "HTTPS", 8728: "RouterOS API", 8729: "RouterOS API", 9100: "Printing", 19302: "Google Meet / STUN",
+    27017: "MongoDB", 51820: "WireGuard", 1900: "SSDP", 5355: "LLMNR", 3702: "WS-Discovery", 8883: "MQTT TLS",
+}
+APP_EXPR = ("multiIf(Proto = 1, 'ICMP', Proto = 47, 'GRE', Proto = 50, 'IPsec ESP', Proto = 17 AND ServicePort = 443, 'QUIC', "
+            "transform(ServicePort, [" + ", ".join(str(k) for k in APPS) + "], ["
+            + ", ".join("'" + v + "'" for v in APPS.values()) + "], "
+            "concat(transform(Proto, [6, 17], ['tcp', 'udp'], toString(Proto)), '/', toString(ServicePort))))")
+FLAGS_EXPR = ("arrayStringConcat(arrayFilter(x -> x != '', [if(bitAnd(TCPFlags, 2) > 0, 'S', ''), "
+              "if(bitAnd(TCPFlags, 16) > 0, 'A', ''), if(bitAnd(TCPFlags, 8) > 0, 'P', ''), "
+              "if(bitAnd(TCPFlags, 1) > 0, 'F', ''), if(bitAnd(TCPFlags, 4) > 0, 'R', '')]), '')")
+EXPORTER_NAME = "dictGetOrDefault('flows.exporters', 'name', toUInt64(ExporterAddress), IPv4NumToString(ExporterAddress))"
+
+
+def _ifname(col: str) -> str:
+    return (f"dictGetOrDefault('flows.if_names', 'name', (toUInt32(ExporterAddress), {col}), "
+            f"if({col} = 0, '—', toString({col})))")
 
 
 @dataclass(frozen=True)
@@ -17,26 +42,40 @@ class Field:
     column: str
     label: str
     dimension: str
+    agg: bool = False  # available in the flows_5m / flows_1h aggregates
 
 
 FIELDS: dict[str, Field] = {f.name.lower(): f for f in (
-    Field("Direction", "enum", "Direction", "Направление", "toString(Direction)"),
-    Field("Route", "enum", "Route", "Маршрут", "toString(Route)"),
-    Field("LocalAddr", "ip", "LocalAddr", "Локальный адрес", "IPv4NumToString(LocalAddr)"),
+    Field("Direction", "enum", "Direction", "Направление", "toString(Direction)", True),
+    Field("Route", "enum", "Route", "Маршрут", "toString(Route)", True),
+    Field("LocalAddr", "ip", "LocalAddr", "Локальный адрес", "IPv4NumToString(LocalAddr)", True),
+    Field("LocalHost", "string", "dictGetOrDefault('flows.hosts', 'name', toUInt64(LocalAddr), IPv4NumToString(LocalAddr))",
+          "Локальное устройство", "dictGetOrDefault('flows.hosts', 'name', toUInt64(LocalAddr), IPv4NumToString(LocalAddr))", True),
     Field("RemoteAddr", "ip", "RemoteAddr", "Удалённый адрес", "IPv4NumToString(RemoteAddr)"),
     Field("RemoteNet", "ip", "RemoteAddr", "Удалённая сеть /24",
           "concat(IPv4NumToString(IPv4CIDRToRange(RemoteAddr, 24).1), '/24')"),
-    Field("RemoteAS", "asn", "RemoteAS", "AS", "concat('AS', toString(RemoteAS), ' ', RemoteASName)"),
-    Field("RemoteASName", "string", "RemoteASName", "Организация AS", "RemoteASName"),
-    Field("RemoteCountry", "string", "RemoteCountry", "Страна", "RemoteCountry"),
+    Field("RemoteHost", "string", "dictGetOrDefault('flows.ptr', 'name', toUInt64(RemoteAddr), '')", "Удалённый хост (PTR)",
+          "dictGetOrDefault('flows.ptr', 'name', toUInt64(RemoteAddr), IPv4NumToString(RemoteAddr))"),
+    Field("RemoteAS", "asn", "RemoteAS", "AS", "concat('AS', toString(RemoteAS), ' ', RemoteASName)", True),
+    Field("RemoteASName", "string", "RemoteASName", "Организация AS", "RemoteASName", True),
+    Field("RemoteCountry", "string", "RemoteCountry", "Страна", "RemoteCountry", True),
     Field("Site", "string", f"dictGetOrDefault('{SITES_DICT}', 'site', tuple(RemoteAddr), '')", "Сайт",
           f"dictGetOrDefault('{SITES_DICT}', 'site', tuple(RemoteAddr), '—')"),
     Field("SiteGroup", "string", f"dictGetOrDefault('{SITES_DICT}', 'grp', tuple(RemoteAddr), '')", "Группа сайтов",
           f"dictGetOrDefault('{SITES_DICT}', 'grp', tuple(RemoteAddr), '—')"),
+    Field("Threat", "string", "dictGetOrDefault('flows.threats', 'list', tuple(RemoteAddr), '')", "Список угроз",
+          "dictGetOrDefault('flows.threats', 'list', tuple(RemoteAddr), '—')"),
     Field("Proto", "proto", "Proto", "Протокол",
-          "transform(Proto, [1, 6, 17, 47, 50, 51, 132], ['ICMP', 'TCP', 'UDP', 'GRE', 'ESP', 'AH', 'SCTP'], toString(Proto))"),
+          "transform(Proto, [1, 6, 17, 47, 50, 51, 132], ['ICMP', 'TCP', 'UDP', 'GRE', 'ESP', 'AH', 'SCTP'], toString(Proto))", True),
+    Field("Application", "string", APP_EXPR, "Приложение", APP_EXPR, True),
+    Field("ServicePort", "port", "ServicePort", "Порт сервиса", "toString(ServicePort)", True),
     Field("LocalPort", "port", "LocalPort", "Локальный порт", "toString(LocalPort)"),
     Field("RemotePort", "port", "RemotePort", "Удалённый порт", "toString(RemotePort)"),
+    Field("TCPFlags", "port", "TCPFlags", "TCP-флаги", FLAGS_EXPR),
+    Field("Exporter", "ip", "ExporterAddress", "Экспортёр (адрес)", "IPv4NumToString(ExporterAddress)", True),
+    Field("ExporterName", "string", EXPORTER_NAME, "Экспортёр", EXPORTER_NAME, True),
+    Field("InIfName", "string", _ifname("InIf"), "Входящий интерфейс", _ifname("InIf"), True),
+    Field("OutIfName", "string", _ifname("OutIf"), "Исходящий интерфейс", _ifname("OutIf"), True),
 )}
 
 TOKEN = re.compile(r"""
@@ -56,6 +95,7 @@ class FilterParser:
         self._tokens = self._lex(text or "")
         self._pos = 0
         self.params: dict[str, object] = {}
+        self.fields: set[str] = set()
 
     @staticmethod
     def _lex(text: str) -> list[tuple[str, str]]:
@@ -131,6 +171,7 @@ class FilterParser:
         field = FIELDS.get(name.lower())
         if not field:
             raise DomainError(f"Фильтр: неизвестное поле «{name}». Доступны: {', '.join(f.name for f in FIELDS.values())}")
+        self.fields.add(field.name)
         op_kind, op = self._take()
         if op_kind in ("in", "notin"):
             self._take("lp")

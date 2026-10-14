@@ -158,7 +158,7 @@ export default function Clients() {
       {list.error && <ErrorState error={list.error} />}
       <div className="card overflow-hidden">
         <div className="max-h-[calc(100vh-320px)] overflow-auto">
-          <table className="table-ac min-w-[1100px]">
+          <table className="table-nc min-w-[1100px]">
             <thead>
               <tr>
                 {canEdit && <th className="w-8"><Checkbox checked={allSelected} indeterminate={!allSelected && selected.size > 0} title="Выбрать все"

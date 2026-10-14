@@ -1,7 +1,7 @@
 # Диагностика
 
 ```bash
-cd /opt/amnezia-control
+cd /opt/network-control
 docker compose ps
 docker compose logs -f backend
 docker compose logs -f awg-client
@@ -11,7 +11,7 @@ docker compose logs -f flow-collector
 ## Туннель шлюза
 
 ```bash
-docker exec ac-awg-client awg show awg0
+docker exec nc-awg-client awg show awg0
 ping -c3 -I awg0 10.8.1.0
 curl --interface awg0 https://ifconfig.me
 ip rule; ip route show table 200
@@ -49,7 +49,7 @@ ip rule; ip route show table 200
 ## OpenBao
 
 ```bash
-docker exec ac-openbao bao status -address=http://127.0.0.1:8200
+docker exec nc-openbao bao status -address=http://127.0.0.1:8200
 docker compose logs bao-init
 ```
 

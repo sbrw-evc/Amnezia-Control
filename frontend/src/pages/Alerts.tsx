@@ -26,7 +26,7 @@ export default function Alerts() {
 
   return (
     <Page>
-      <PageHeader title="Алерты" icon={<Bell size={20} />} subtitle="Сбои инфраструктуры, квоты и сроки доступа клиентов"
+      <PageHeader title="Алерты" icon={<Bell size={20} />} subtitle="Сбои устройств и инфраструктуры, правила трафика, квоты и сроки доступа клиентов"
         actions={<Segmented layoutId="al-mode" value={mode} onChange={setMode} options={[{ value: "open", label: "Открытые" }, { value: "all", label: "История" }]} />} />
       <div ref={list} className="space-y-2">
         {alerts.isLoading && Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-16" />)}
@@ -48,6 +48,7 @@ export default function Alerts() {
               <div className="text-right text-xs text-slate-500">{Fmt.dateTime(a.ts)}</div>
               <div className="flex gap-1">
                 {a.target_id && a.key.startsWith("client") && <button className="btn-ghost btn-sm" onClick={() => nav(`/clients/${a.target_id}`)}>Клиент</button>}
+                {a.link && <button className="btn-ghost btn-sm" onClick={() => nav(a.link!)}>{a.key.startsWith("flow.") ? "Трафик" : "Открыть"}</button>}
                 {!a.resolved_at && !a.acknowledged_by && <button className="btn-ghost btn-sm" onClick={() => ack.mutate(a.id)}><Check size={14} /> Принять</button>}
               </div>
             </div>

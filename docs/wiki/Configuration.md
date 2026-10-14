@@ -11,18 +11,20 @@
 | `AWG_BIN` | `awg` | CLI tool (`awg` or `wg`) |
 | `AWG_DIR` | `/opt/amnezia/awg` | Config directory inside the container |
 | `ROUTER_HOST` | `192.168.0.1` | MikroTik address |
+| `KEEP_INTERNAL` | `1` | Collector: keep flows between two local addresses (`Direction = internal`) |
 | `ROUTER_SSH_USER` | `admin` | SSH user on MikroTik |
 | `GATEWAY_IP` | `192.168.0.210` | LAN address of the gateway (the Docker host) |
 | `LAN_CIDR` | `192.168.0.0/24` | Local network (used to classify flows) |
 | `LAN_IF` | `eth0` | LAN interface of the gateway host |
 | `TUNNEL_NET` | `10.8.1.0/24` | AmneziaWG tunnel network |
-| `MT_WG_IFACE` | `wg-ac` | WireGuard interface on MikroTik (see [[MikroTik-VPN]]) |
+| `MT_WG_IFACE` | `wg-nc` | WireGuard interface on MikroTik (see [[MikroTik-VPN]]) |
 | `MT_WG_NETWORK` | `10.9.0.0/24` | Network of MikroTik VPN clients; the first address belongs to the router |
 | `MT_WG_PORT` | `51820` | UDP port of the MikroTik WireGuard server |
 | `SSH_KEY_FILE` | `/root/.ssh/id_ed25519` | SSH key imported into OpenBao on first start |
 | `PUBLIC_BASE_URL` | `http://localhost:8080` | Panel URL (used in config share links) |
 | `PANEL_PORT` | `8080` | Panel port |
 | `FLOW_PORT` | `2055` | UDP port for NetFlow |
+| `SFLOW_PORT` | `6343` | UDP port for sFlow |
 | `INITIAL_ADMIN_USER` / `INITIAL_ADMIN_PASSWORD` | `admin` / — | First administrator (created when there are no users); the password is valid only until the first login |
 | `POSTGRES_PASSWORD` | — | PostgreSQL password |
 | `CLICKHOUSE_PASSWORD` | — | ClickHouse password |
@@ -49,5 +51,9 @@
 | | Report time zone | For the heatmap and messages |
 | Notifications | Enable, minimum severity, Telegram chat id | See [[Monitoring]] |
 | Backups | Daily backup, number of backups kept | See [[Backups]] |
+| Network and devices | Client offline after, forget inactive clients after | 15 minutes, 90 days |
+| | Collector address and port for flow export | Empty — `GATEWAY_IP`, port 2055; used by the **Flow export** action of devices |
+| Traffic analysis | Threat lists, refresh interval, networks never flagged | See [[Flows]] |
+| | Reverse DNS (PTR) of remote hosts | On by default |
 
 Settings are stored in PostgreSQL and picked up by all processes within 15 seconds.

@@ -91,7 +91,7 @@ export default function Dashboard() {
         </Card>
         <Card title="Последние подключения" actions={<button className="btn-ghost btn-sm" onClick={() => nav("/map")}>Карта →</button>} bodyClass="p-0">
           <div className="max-h-[320px] overflow-y-auto">
-            <table className="table-ac">
+            <table className="table-nc">
               <tbody>
                 {(geo.data?.recent ?? []).map((r, i) => (
                   <motion.tr key={r.ts + r.ip} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }}>

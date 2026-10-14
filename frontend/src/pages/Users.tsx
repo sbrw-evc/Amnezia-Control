@@ -42,7 +42,7 @@ export default function Users() {
       <PageHeader title="Доступ к панели" icon={<UserCog size={20} />} subtitle="Операторы панели и их роли. Пароли хранятся как argon2-хеши, секреты 2FA — в OpenBao."
         actions={<button className="btn-primary" onClick={() => { setForm({ username: "", display_name: "", role: "operator", password: genPassword() }); setCreating(true); }}><Plus size={16} /> Добавить</button>} />
       <Card bodyClass="p-0">
-        <table className="table-ac">
+        <table className="table-nc">
           <thead><tr><th>Пользователь</th><th>Роль</th><th>Статус</th><th>2FA</th><th>Последний вход</th><th /></tr></thead>
           <tbody>
             {users.isLoading && <tr><td colSpan={6}><Skeleton className="h-24" /></td></tr>}

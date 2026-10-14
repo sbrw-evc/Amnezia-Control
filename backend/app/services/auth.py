@@ -198,7 +198,7 @@ class AuthService:
     async def totp_begin(self, user: PanelUser) -> dict:
         secret = pyotp.random_base32()
         await self._secrets.put(self._totp_path(user.id, pending=True), {"secret": secret})
-        uri = pyotp.TOTP(secret).provisioning_uri(name=user.username, issuer_name="Amnezia Control")
+        uri = pyotp.TOTP(secret).provisioning_uri(name=user.username, issuer_name="Network Control")
 
         def render() -> str:
             buf = io.BytesIO()

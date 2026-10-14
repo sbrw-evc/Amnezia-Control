@@ -44,7 +44,7 @@ export default function Audit() {
         </div>
       </div>
       <Card bodyClass="p-0">
-        <table className="table-ac">
+        <table className="table-nc">
           <thead><tr><th>Время</th><th>Кто</th><th>Действие</th><th>Объект</th><th>Детали</th><th>IP</th></tr></thead>
           <tbody>
             {data.isLoading && <tr><td colSpan={6}><Skeleton className="h-40" /></td></tr>}

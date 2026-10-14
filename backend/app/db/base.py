@@ -8,6 +8,7 @@ from .models import Base
 MIGRATIONS = (
     "ALTER TABLE vpn_clients ADD COLUMN IF NOT EXISTS server VARCHAR(16) NOT NULL DEFAULT 'amnezia'",
     "CREATE INDEX IF NOT EXISTS ix_vpn_clients_server ON vpn_clients (server)",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS link VARCHAR(1024) NOT NULL DEFAULT ''",
 )
 
 

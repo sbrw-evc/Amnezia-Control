@@ -24,7 +24,7 @@ export default function ApiTokens() {
     <Card title={<span className="flex items-center gap-2"><KeyRound size={14} /> API-токены</span>}
       actions={<button className="btn-ghost btn-sm" onClick={() => { setForm({ name: "", role: "viewer", days: "90" }); setOpen(true); }}><Plus size={14} /> Выпустить</button>}
       bodyClass="p-0">
-      <table className="table-ac">
+      <table className="table-nc">
         <thead><tr><th>Название</th><th>Префикс</th><th>Роль</th><th>Истекает</th><th>Использован</th><th>Создал</th><th /></tr></thead>
         <tbody>
           {tokens.data?.map((t) => (

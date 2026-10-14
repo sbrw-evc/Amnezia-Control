@@ -56,7 +56,7 @@ export default function LoginPage() {
             <Activity className="text-white" size={22} />
           </div>
           <div>
-            <div className="text-lg font-semibold text-white">Amnezia Control</div>
+            <div className="text-lg font-semibold text-white">Network Control</div>
             <div className="text-xs text-slate-400">Панель управления VPN</div>
           </div>
         </div>

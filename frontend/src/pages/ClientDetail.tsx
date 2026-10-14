@@ -107,7 +107,7 @@ export default function ClientDetail() {
       </div>
 
       <Card title={<span className="flex items-center gap-2"><MapPin size={14} /> История подключений</span>} bodyClass="p-0">
-        <table className="table-ac">
+        <table className="table-nc">
           <thead><tr><th>Время</th><th>IP</th><th>Локация</th></tr></thead>
           <tbody>
             {(c.connections ?? []).map((e) => (

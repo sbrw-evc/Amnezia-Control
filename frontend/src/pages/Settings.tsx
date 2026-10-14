@@ -35,6 +35,18 @@ const GROUPS: { title: string; fields: Def[] }[] = [
       options: [["info", "Инфо"], ["warning", "Внимание"], ["critical", "Критично"]] },
     { key: "notify_telegram_chat_id", label: "Telegram chat id", hint: "id пользователя, группы или канала", type: "text" },
   ] },
+  { title: "Сеть и устройства", fields: [
+    { key: "endpoint_offline_minutes", label: "Клиент считается офлайн через, мин", type: "number" },
+    { key: "endpoint_retention_days", label: "Забывать неактивных клиентов через, дней", type: "number" },
+    { key: "flow_collector_host", label: "Адрес коллектора для экспорта потоков", hint: "пусто — GATEWAY_IP", type: "text" },
+    { key: "flow_collector_port", label: "Порт NetFlow / IPFIX", type: "number" },
+  ] },
+  { title: "Анализ трафика", fields: [
+    { key: "threat_enabled", label: "Проверять адреса по спискам угроз", type: "bool" },
+    { key: "threat_refresh_hours", label: "Обновлять списки угроз раз в, ч", type: "number" },
+    { key: "threat_exclude", label: "Не помечать сети", hint: "свои публичные адреса, через пробел", type: "text" },
+    { key: "rdns_enabled", label: "Определять имена удалённых хостов (PTR)", type: "bool" },
+  ] },
   { title: "Резервное копирование", fields: [
     { key: "backup_enabled", label: "Ежедневная резервная копия", type: "bool" },
     { key: "backup_keep", label: "Хранить копий", type: "number" },

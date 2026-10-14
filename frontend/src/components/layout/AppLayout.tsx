@@ -9,7 +9,7 @@ import CommandPalette from "./CommandPalette";
 import { ConfirmHost } from "@/components/ui/Confirm";
 import { useLive } from "@/lib/live";
 
-const KEY = "amnezia-control.sidebar.collapsed";
+const KEY = "network-control.sidebar.collapsed";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(() => {
@@ -60,7 +60,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-2 border-b border-base-700/60 px-4 py-2 lg:hidden">
           <button className="rounded-md p-2 text-slate-300 hover:bg-base-800" onClick={() => setMobileOpen(true)}><Menu size={20} /></button>
-          <span className="font-semibold text-white">Amnezia Control</span>
+          <span className="font-semibold text-white">Network Control</span>
           <div className="ml-auto flex items-center gap-1"><NotificationBell onOpen={() => setNotices(true)} />
           <button className="rounded-md p-2 text-slate-300 hover:bg-base-800" onClick={() => setPalette(true)}><Search size={18} /></button></div>
         </div>

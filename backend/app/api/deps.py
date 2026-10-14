@@ -8,8 +8,8 @@ from ..domain.errors import Forbidden, Unauthorized
 from ..domain.models import Role
 from ..services.common import Actor
 
-COOKIE = "ac_session"
-CSRF_HEADER = "amnezia-control"
+COOKIE = "nc_session"
+CSRF_HEADER = "network-control"
 
 
 def container(request: Request) -> Container:

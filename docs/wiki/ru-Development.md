@@ -6,7 +6,8 @@
 backend/app/
   domain/        сущности-значения и ошибки
   ports.py       абстракции внешних систем
-  adapters/      Amnezia (SSH), MikroTik (SSH), OpenBao, ClickHouse, DB-IP, Telegram
+  adapters/      Amnezia (SSH), MikroTik (SSH), OpenBao, ClickHouse, DB-IP, Telegram, IEEE OUI
+  adapters/devices/  драйверы устройств: REST / RCI / Open API, профили SSH CLI и парсеры, SNMP, поиск
   db/            модели SQLAlchemy, Database, репозитории
   services/      бизнес-логика
   api/           роутеры FastAPI, схемы, зависимости
@@ -57,3 +58,24 @@ docker compose up -d
 1. Добавьте `Field` в `backend/app/services/flowfilter.py` (имя, тип, колонка, подпись, SQL-выражение измерения).
 2. При необходимости — колонку в `FlowSchema` и заполнение в `flow-collector/collector.py`.
 3. Фронтенд получает список полей из `/api/flows/fields` автоматически.
+
+## Добавление платформы устройств
+
+1. Напишите драйвер в `backend/app/adapters/devices/` (или `CliProfile` в `cli.py` для CLI, похожего на Cisco или
+   Comware): `collect()` возвращает `Snapshot` (сведения, интерфейсы, соседи, клиенты, дочерние устройства), `apply()`
+   выполняет действия из `capabilities`, `backup()` возвращает текст конфигурации.
+2. Зарегистрируйте его в `PLATFORMS` (`adapters/devices/__init__.py`) с подключениями, портами и полями учётных данных —
+   форма, матрица возможностей и API берут их оттуда.
+3. Добавьте тесты парсеров с реальным выводом в `backend/tests/test_drivers.py`.
+
+## Тесты
+
+```bash
+cd backend
+pip install -r requirements.txt -r requirements-dev.txt
+TEST_DATABASE_URL=postgresql+asyncpg://user:pass@127.0.0.1:5432/test python -m pytest -q tests
+```
+
+Тесты выполняют настоящий SQL ClickHouse (схема, миграции, агрегаты, визуализация, правила) на встроенном движке
+`chdb`, сервис устройств и карту сети — на PostgreSQL (пропускаются без `TEST_DATABASE_URL`), CLI-драйверы — через
+настоящую SSH-сессию с эмулятором Cisco IOS, HTTP-драйверы — на подменённых API.

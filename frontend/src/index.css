@@ -27,11 +27,11 @@
   .btn-sm { @apply px-2.5 py-1.5 text-xs; }
   .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-base-700 bg-base-850 px-2.5 py-1 text-xs text-slate-300 transition hover:border-base-600; }
   .chip-on { @apply border-accent/60 bg-accent/15 text-blue-200; }
-  .table-ac { @apply w-full text-sm; }
-  .table-ac thead th { @apply sticky top-0 z-10 bg-base-900/95 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 backdrop-blur; }
-  .table-ac tbody td { @apply whitespace-nowrap border-t border-base-700/50 px-3 py-2.5 align-middle; }
-  .table-ac thead th { @apply whitespace-nowrap; }
-  .table-ac tbody tr { @apply transition-colors hover:bg-base-800/60; }
+  .table-nc { @apply w-full text-sm; }
+  .table-nc thead th { @apply sticky top-0 z-10 bg-base-900/95 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 backdrop-blur; }
+  .table-nc tbody td { @apply whitespace-nowrap border-t border-base-700/50 px-3 py-2.5 align-middle; }
+  .table-nc thead th { @apply whitespace-nowrap; }
+  .table-nc tbody tr { @apply transition-colors hover:bg-base-800/60; }
   .mono { @apply font-mono text-[12px]; }
 }
 

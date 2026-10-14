@@ -76,7 +76,7 @@ export default function Analytics() {
           {geo.data ? <Donut data={geo.data.countries.slice(0, 8).map((c, i) => ({ name: c.country, value: c.connections, color: PALETTE[i % PALETTE.length] }))} height={260} /> : <Skeleton className="h-64" />}
         </Card>
         <Card className="xl:col-span-2" title="Страны" bodyClass="p-0">
-          <table className="table-ac">
+          <table className="table-nc">
             <thead><tr><th>Страна</th><th>Подключений</th><th>Клиентов</th><th className="w-1/3">Доля</th></tr></thead>
             <tbody>
               {(geo.data?.countries ?? []).map((c) => {

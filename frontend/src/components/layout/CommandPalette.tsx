@@ -11,7 +11,8 @@ const PAGES = [
   { label: "Обзор", to: "/" }, { label: "Клиенты VPN", to: "/clients" }, { label: "Аналитика", to: "/analytics" },
   { label: "Карта подключений", to: "/map" }, { label: "Анализ потоков", to: "/flows" }, { label: "Резервные копии", to: "/backups" }, { label: "Алерты", to: "/alerts" }, { label: "Маршрутизация", to: "/routing" }, { label: "VPN на MikroTik", to: "/mikrotik-vpn" },
   { label: "Сервер AWG", to: "/server" }, { label: "Журнал аудита", to: "/audit" }, { label: "Настройки", to: "/settings" },
-  { label: "Профиль и безопасность", to: "/profile" },
+  { label: "Профиль и безопасность", to: "/profile" }, { label: "Сетевые устройства", to: "/devices" },
+  { label: "Клиенты сети", to: "/endpoints" }, { label: "Карта сети", to: "/network-map" },
 ];
 
 export default function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {

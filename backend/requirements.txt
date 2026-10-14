@@ -11,3 +11,5 @@ maxminddb==2.6.2
 pydantic-settings==2.7.0
 python-multipart==0.0.20
 tzdata==2024.2
+asyncssh==2.19.0
+pysnmp==7.1.30

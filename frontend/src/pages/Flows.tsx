@@ -17,15 +17,17 @@ import Flag from "@/components/ui/Flag";
 import { Checkbox, NumberInput, Select } from "@/components/ui/Controls";
 import { TrafficChart } from "@/components/charts/Charts";
 import { GridCharts, SankeyChart, TimeSeriesChart, UnitFormatter, seriesColor } from "@/components/charts/FlowCharts";
+import { Exporters, Rules, SavedViews, Threats } from "@/components/flows/FlowExtras";
 
-type Tab = "overview" | "visualize" | "recent";
+type Tab = "overview" | "visualize" | "recent" | "exporters" | "rules" | "threats";
 const PRESETS: { value: string; label: string; seconds: number }[] = [
   { value: "15m", label: "15 мин", seconds: 900 }, { value: "1h", label: "1 ч", seconds: 3600 },
   { value: "6h", label: "6 ч", seconds: 21600 }, { value: "24h", label: "24 ч", seconds: 86400 },
   { value: "7d", label: "7 дн", seconds: 604800 }, { value: "30d", label: "30 дн", seconds: 2592000 },
+  { value: "90d", label: "90 дн", seconds: 7776000 }, { value: "1y", label: "1 год", seconds: 31536000 },
 ];
 const DEFAULT: FlowQuery & { preset: string; refresh: number } = {
-  preset: "6h", refresh: 0, dimensions: ["Site"], filter: "", limit: 10, limitType: "avg", unit: "bps",
+  preset: "6h", refresh: 0, dimensions: ["Application"], filter: "", limit: 10, limitType: "avg", unit: "bps",
   graph: "stacked", bidirectional: false, previousPeriod: false,
 };
 type State = typeof DEFAULT;
@@ -105,7 +107,7 @@ function Overview() {
         <Kpi label="Объём ClickHouse" value={st?.disk_bytes ?? 0} format={(n) => Fmt.bytes(n)} icon={<Waypoints size={16} />} tone="amber" delay={0.15}
           hint={<span className="flex items-center gap-1"><StatusDot on={!!st?.ok} pulse={false} /> {st?.ok ? "ClickHouse доступен" : "нет связи"}</span>} />
       </div>
-      <Card title="Трафик за 24 часа (по потокам MikroTik)">
+      <Card title="Трафик за 24 часа (по потокам с устройств)">
         {points.length > 1 ? <TrafficChart points={points} mode="rate" height={260} /> : <Skeleton className="h-[260px]" />}
       </Card>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -115,6 +117,9 @@ function Overview() {
         <WidgetList title="Протоколы · 1 ч" rows={d?.widgets.proto} />
         <WidgetList title="Удалённые порты · 1 ч" rows={d?.widgets.port} />
         <WidgetList title="Устройства LAN · 1 ч" rows={d?.widgets.device} />
+        <WidgetList title="Приложения · 1 ч" rows={d?.widgets.app} />
+        <WidgetList title="Экспортёры · 1 ч" rows={d?.widgets.exporter} />
+        {!!d?.widgets.threat?.length && <WidgetList title="Контакты с угрозами · 1 ч" rows={d?.widgets.threat} />}
       </div>
       {d?.last_flow && (
         <Card title="Последний поток">
@@ -259,7 +264,7 @@ function Visualize() {
         <div>
           <div className="label flex items-center justify-between">Фильтр <span className="text-[10px] text-slate-500">Ctrl+Enter — применить</span></div>
           <textarea className="input mono min-h-[90px]" spellCheck={false} value={state.filter} onChange={(e) => set({ filter: e.target.value })}
-            placeholder={"Route = vpn AND RemoteCountry IN (US, NL)\nSite LIKE '%google%' AND NOT Proto = udp"} />
+            placeholder={"Route = vpn AND RemoteCountry IN (US, NL)\nApplication = HTTPS AND LocalHost LIKE '%iphone%'"} />
           <div className="mt-1 flex flex-wrap gap-1">
             {(fields.data ?? []).map((f) => (
               <button key={f.name} className="rounded bg-base-800 px-1.5 py-0.5 text-[10px] text-slate-400 hover:text-white" title={f.label}
@@ -284,6 +289,7 @@ function Visualize() {
             </div>
           )}
         </div>
+        <SavedViews state={state as unknown as Record<string, unknown>} onLoad={(v) => { const next = { ...DEFAULT, ...(v as Partial<State>) }; setState(next); apply(next); }} />
         <button className="btn-primary w-full" onClick={() => apply()}><Play size={14} /> Применить</button>
       </Card>
 
@@ -291,17 +297,18 @@ function Visualize() {
         <Card title={<span className="flex items-center gap-2">
           {res ? `${res.dimensions.map(label).join(" → ") || "Весь трафик"} · ${res.unit_label}` : "Визуализация"}
           {live && <Badge tone="green"><StatusDot on /> live</Badge>}
+          {res?.table && res.table !== "flows" && <Badge tone="violet" className="normal-case">агрегаты {res.table === "flows_1h" ? "1 ч" : "5 мин"}</Badge>}
         </span>}>
           {result.isFetching && !res && <Skeleton className="h-[380px]" />}
           {result.error && <ErrorState error={result.error} />}
           {res && res.graph === "sankey" && (res.links?.length ? <SankeyChart result={res} /> : <EmptyState title="Нет потоков за период" />)}
           {res && res.graph === "grid" && <GridCharts result={res} />}
-          {res && !["sankey", "grid"].includes(res.graph) && (res.series?.length ? <TimeSeriesChart result={res} /> : <EmptyState title="Нет потоков за период" hint="Проверьте, что MikroTik отправляет NetFlow на коллектор" />)}
+          {res && !["sankey", "grid"].includes(res.graph) && (res.series?.length ? <TimeSeriesChart result={res} /> : <EmptyState title="Нет потоков за период" hint="Проверьте, что устройства отправляют NetFlow / IPFIX / sFlow на коллектор" />)}
         </Card>
         {res && res.graph !== "sankey" && !!res.series?.length && (
           <Card bodyClass="p-0">
             <div className="overflow-x-auto">
-              <table className="table-ac">
+              <table className="table-nc">
                 <thead><tr><th /><th>Серия</th><th>Мин</th><th>Макс</th><th>Последнее</th><th>Среднее</th><th>95-й перц.</th><th>Всего</th></tr></thead>
                 <tbody>
                   {res.series.map((s, i) => (
@@ -324,8 +331,9 @@ function Visualize() {
 }
 
 function Recent() {
-  const [filter, setFilter] = useState("");
-  const [applied, setApplied] = useState("");
+  const [params] = useSearchParams();
+  const [filter, setFilter] = useState(params.get("f") ?? "");
+  const [applied, setApplied] = useState(params.get("f") ?? "");
   const q = useQuery({ queryKey: ["flows-recent", applied], queryFn: () => api.flows.recent(applied, 200), refetchInterval: 15_000, retry: false });
   return (
     <div className="space-y-4">
@@ -337,19 +345,21 @@ function Recent() {
       {q.error && <ErrorState error={q.error} />}
       <Card bodyClass="p-0">
         <div className="max-h-[70vh] overflow-auto">
-          <table className="table-ac">
-            <thead><tr><th>Время</th><th>Напр.</th><th>Маршрут</th><th>Локальный</th><th>Удалённый</th><th>Сайт</th><th>AS</th><th>Протокол</th><th>Байт</th></tr></thead>
+          <table className="table-nc">
+            <thead><tr><th>Время</th><th>Напр.</th><th>Маршрут</th><th>Локальный</th><th>Удалённый</th><th>Приложение</th><th>Сайт / AS</th><th>Экспортёр</th><th>Байт</th></tr></thead>
             <tbody>
               {(q.data ?? []).map((f, i) => (
                 <tr key={i}>
                   <td className="text-xs text-slate-400">{Fmt.dateTime(f.TimeReceived.replace(" ", "T") + "Z")}</td>
-                  <td>{f.Direction === "out" ? <Badge tone="blue">↑ out</Badge> : <Badge tone="amber">↓ in</Badge>}</td>
+                  <td>{f.Direction === "out" ? <Badge tone="blue">↑ out</Badge> : f.Direction === "in" ? <Badge tone="amber">↓ in</Badge> : <Badge>↔ LAN</Badge>}</td>
                   <td>{f.Route === "vpn" ? <Badge tone="violet">VPN</Badge> : <Badge>direct</Badge>}</td>
-                  <td className="mono">{f.LocalAddr}{f.LocalPort ? `:${f.LocalPort}` : ""}</td>
-                  <td className="mono"><Flag code={f.RemoteCountry} /> {f.RemoteAddr}{f.RemotePort ? `:${f.RemotePort}` : ""}</td>
-                  <td>{f.Site}</td>
-                  <td className="max-w-[220px] truncate text-slate-400" title={f.RemoteASName}>AS{f.RemoteAS} {f.RemoteASName}</td>
-                  <td>{f.Protocol}</td>
+                  <td className="mono">{f.LocalHost && f.LocalHost !== f.LocalAddr && <div className="font-sans text-slate-200">{f.LocalHost}</div>}{f.LocalAddr}{f.LocalPort ? `:${f.LocalPort}` : ""}</td>
+                  <td className="mono"><Flag code={f.RemoteCountry} /> {f.RemoteAddr}{f.RemotePort ? `:${f.RemotePort}` : ""}
+                    {f.RemoteHost && f.RemoteHost !== "—" && <div className="max-w-[200px] truncate font-sans text-[11px] text-slate-500">{f.RemoteHost}</div>}
+                    {f.Threat && <Badge tone="red">{f.Threat}</Badge>}</td>
+                  <td>{f.Application ?? f.Protocol}{f.Flags && <div className="mono text-[10px] text-slate-500">{f.Flags}</div>}</td>
+                  <td className="max-w-[220px] truncate text-slate-400" title={f.RemoteASName}>{f.Site !== "—" && <div className="text-slate-200">{f.Site}</div>}AS{f.RemoteAS} {f.RemoteASName}</td>
+                  <td className="text-xs text-slate-400">{f.Exporter}{(f.InIfName || f.OutIfName) && <div className="text-[10px] text-slate-500">{f.InIfName} → {f.OutIfName}</div>}</td>
                   <td className="mono">{Fmt.bytes(Number(f.Bytes))}</td>
                 </tr>
               ))}
@@ -369,14 +379,18 @@ export default function Flows() {
   return (
     <Page>
       <PageHeader title="Анализ потоков" icon={<Waypoints size={20} />}
-        subtitle="NetFlow с MikroTik → ClickHouse: кто, куда и каким маршрутом передаёт трафик"
+        subtitle="NetFlow / IPFIX / sFlow с устройств сети → ClickHouse: кто, куда, каким маршрутом и через какой интерфейс"
         actions={<Segmented layoutId="flows-tab" value={tab} onChange={setTab} options={[
           { value: "overview", label: "Обзор" }, { value: "visualize", label: <span className="flex items-center gap-1"><Plus size={11} />Визуализация</span> },
-          { value: "recent", label: "Последние потоки" },
+          { value: "recent", label: "Потоки" }, { value: "exporters", label: "Экспортёры" },
+          { value: "rules", label: "Правила" }, { value: "threats", label: "Угрозы" },
         ]} />} />
       {tab === "overview" && <Overview />}
       {tab === "visualize" && <Visualize />}
       {tab === "recent" && <Recent />}
+      {tab === "exporters" && <Exporters />}
+      {tab === "rules" && <Rules />}
+      {tab === "threats" && <Threats />}
     </Page>
   );
 }

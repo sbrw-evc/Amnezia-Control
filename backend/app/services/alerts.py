@@ -12,15 +12,18 @@ class AlertService:
         self._bus = bus
         self.notifications = None
 
-    async def raise_(self, key: str, severity: Severity, title: str, message: str = "", target_id: str = "") -> None:
+    async def raise_(self, key: str, severity: Severity, title: str, message: str = "", target_id: str = "",
+                     link: str = "") -> None:
         async with self._db.session() as s:
             repo = AlertRepo(s)
             existing = await repo.open_by_key(key)
             if existing:
                 if existing.severity != severity or existing.message != message:
                     existing.severity, existing.message, existing.title = severity, message, title
+                if link:
+                    existing.link = link
                 return
-            repo.add(Alert(key=key, severity=severity, title=title, message=message, target_id=target_id))
+            repo.add(Alert(key=key, severity=severity, title=title, message=message, target_id=target_id, link=link))
         self._bus.publish("alert", {"key": key, "severity": severity.value, "title": title})
         if self.notifications:
             await self.notifications.alert_raised(severity, title, message)
@@ -41,6 +44,11 @@ class AlertService:
             for a in await AlertRepo(s).open():
                 if a.key.startswith(prefix) and a.key not in keep:
                     a.resolved_at = utcnow()
+                    self._bus.publish("alert", {"key": a.key, "resolved": True})
+
+    async def open_keys(self, prefix: str) -> set[str]:
+        async with self._db.session() as s:
+            return {a.key for a in await AlertRepo(s).open() if a.key.startswith(prefix)}
 
     async def acknowledge(self, alert_id: int, actor: Actor) -> None:
         async with self._db.session() as s:
@@ -54,7 +62,7 @@ class AlertService:
             repo = AlertRepo(s)
             rows = await (repo.history() if include_resolved else repo.open())
         return [{"id": a.id, "key": a.key, "ts": a.ts.isoformat(), "severity": a.severity.value, "title": a.title,
-                 "message": a.message, "target_id": a.target_id, "acknowledged_by": a.acknowledged_by,
+                 "message": a.message, "target_id": a.target_id, "link": a.link or "", "acknowledged_by": a.acknowledged_by,
                  "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None} for a in rows]
 
     async def counts(self) -> dict:
