@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from .api import routes_admin, routes_auth, routes_clients, routes_devices, routes_flows, routes_ops
+from .api import routes_admin, routes_auth, routes_clients, routes_devices, routes_flows, routes_onboarding, routes_ops
 from .config import get_settings
 from .container import Container
 from .domain.errors import DomainError
@@ -52,5 +52,5 @@ async def health():
 
 
 for r in (routes_auth.router, routes_clients.router, routes_clients.public, routes_ops.router, routes_admin.router,
-          routes_flows.router, routes_devices.router):
+          routes_flows.router, routes_devices.router, routes_onboarding.router):
     app.include_router(r)

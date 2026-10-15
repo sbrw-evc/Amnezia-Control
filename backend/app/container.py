@@ -30,6 +30,7 @@ from .services.devices import DeviceService
 from .services.flows import DEFAULT_THREAT_LISTS
 from .services.health import HealthMonitor
 from .services.notifications import NotificationService
+from .services.onboarding import OnboardingService
 from .services.policy import PolicyEnforcer
 from .services.routing import RoutingService, SiteListCompiler
 from .services.server import ServerConfigEditor, ServerService
@@ -102,6 +103,8 @@ class Container:
         self.detector = Detector(self.clickhouse, self.db, self.alerts, self.audit)
         self.topology = TopologyService(self.db, self.settings, self.flows,
                                         {"vpn_host": cfg.awg_host, "router_host": cfg.router_host})
+        self.onboarding = OnboardingService(self.db, self.settings, self.spa, self.notifier, self.backups, self.flows,
+                                            [cfg.spa_public_url, cfg.public_base_url])
         self.election = LeaderElection(dsn, self._become_leader, self._lose_leadership)
         self.scheduler: Scheduler | None = None
 
