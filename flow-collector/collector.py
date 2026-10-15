@@ -18,7 +18,10 @@ CH_URL = os.environ.get("CLICKHOUSE_URL", "http://clickhouse:8123")
 CH_USER = os.environ.get("CLICKHOUSE_USER", "amnezia")
 CH_PASSWORD = os.environ.get("CLICKHOUSE_PASSWORD", "")
 CH_DB = os.environ.get("CLICKHOUSE_DB", "flows")
-LAN = [ipaddress.ip_network(n.strip()) for n in os.environ.get("LAN_CIDR", "192.168.0.0/24").split(",") if n.strip()]
+LAN = [ipaddress.ip_network(n.strip(), strict=False)
+       for n in os.environ.get("LAN_CIDR", "192.168.0.0/24").split(",") if n.strip()]
+# IPv6 unique local and link-local addresses never leave the site: always local.
+ALWAYS_LOCAL = [ipaddress.ip_network("fc00::/7"), ipaddress.ip_network("fe80::/10")]
 EXTRA_LAN: list = []
 GATEWAY = os.environ.get("GATEWAY_IP", "192.168.0.210")
 VPN_HOST = os.environ.get("AWG_HOST", "")
@@ -33,18 +36,40 @@ DATABASES = {"city": "dbip-city-lite", "asn": "dbip-asn-lite"}
 
 
 def is_local(addr) -> bool:
-    return any(addr in n for n in LAN) or any(addr in n for n in EXTRA_LAN)
+    return any(addr in n for n in LAN) or any(addr in n for n in EXTRA_LAN) or any(addr in n for n in ALWAYS_LOCAL)
 
 
 def service_port(lport: int, rport: int) -> int:
     return lport if lport and (not rport or lport < rport) else rport
 
 
-def ipv4(value) -> str:
-    v = str(value or "")
-    if v.startswith("::ffff:"):
-        v = v[7:]
-    return v if v and ":" not in v else "0.0.0.0"
+def address(value):
+    """An address as goflow2 renders it (IPv4, IPv6 or IPv4-mapped IPv6) → ipaddress object; None when absent."""
+    v = str(value or "").strip().split("%")[0]
+    if not v:
+        return None
+    try:
+        a = ipaddress.ip_address(v)
+    except ValueError:
+        return None
+    if a.version == 6 and a.ipv4_mapped:
+        a = a.ipv4_mapped
+    return None if a.is_unspecified else a
+
+
+def column(a) -> str:
+    """The text of an IPv6 column: IPv4 as ::ffff:a.b.c.d, which every ClickHouse version parses."""
+    if a is None:
+        return "::ffff:0.0.0.0"
+    return f"::ffff:{a}" if a.version == 4 else str(a)
+
+
+def exporter_address(flow: dict) -> str:
+    a = address(pick(flow, "sampler_address", "SamplerAddress", default=""))
+    return str(a) if a else "0.0.0.0"
+
+
+BROADCAST = ipaddress.ip_address("255.255.255.255")
 
 
 class GeoEnricher:
@@ -114,16 +139,16 @@ class Classifier:
         self._geo = geo
 
     def __call__(self, flow: dict) -> dict | None:
-        src, dst = pick(flow, "src_addr", "SrcAddr"), pick(flow, "dst_addr", "DstAddr")
-        if not src or not dst or ":" in src or ":" in dst:
+        s, d = address(pick(flow, "src_addr", "SrcAddr")), address(pick(flow, "dst_addr", "DstAddr"))
+        if s is None or d is None:
             return None
-        s, d = ipaddress.ip_address(src), ipaddress.ip_address(dst)
+        src, dst = str(s), str(d)
         internal = is_local(s) and is_local(d)
         if internal and not KEEP_INTERNAL:
             return None
         if VPN_HOST and VPN_HOST in (src, dst):
             return None
-        if s.is_multicast or d.is_multicast or d == ipaddress.ip_address("255.255.255.255"):
+        if s.is_multicast or d.is_multicast or d == BROADCAST:
             return None
         proto = pick(flow, "proto", "Proto", default=0)
         proto = PROTOCOLS.get(str(proto).upper(), proto) if not str(proto).isdigit() else int(proto)
@@ -133,11 +158,11 @@ class Classifier:
             country, asn, org = "", 0, ""
         elif is_local(s):
             direction, local, remote, lport, rport = "out", src, dst, sport, dport
-            route = "vpn" if pick(flow, "next_hop", "NextHop", default="") == GATEWAY else "direct"
+            route = "vpn" if str(address(pick(flow, "next_hop", "NextHop", default="")) or "") == GATEWAY else "direct"
         else:
             direction, local, remote, lport, rport = "in", dst, src, dport, sport
             # replies of tunnelled connections come back from the gateway on the router's LAN side
-            exporter = ipv4(pick(flow, "sampler_address", "SamplerAddress", default=""))
+            exporter = exporter_address(flow)
             route = "vpn" if is_local(d) and (not ROUTER or exporter in (ROUTER, "0.0.0.0")) else "direct"
         if not internal:
             country, asn, org = self._geo.lookup(remote)
@@ -145,11 +170,12 @@ class Classifier:
         received = int(pick(flow, "time_received_ns", "TimeReceivedNs", default=0)) // 1_000_000_000 \
             or int(pick(flow, "time_received", "TimeReceived", default=0)) or int(time.time())
         in_if, out_if = int(pick(flow, "in_if", "InIf", default=0)), int(pick(flow, "out_if", "OutIf", default=0))
-        return {"TimeReceived": received, "Direction": direction, "Route": route, "LocalAddr": local, "RemoteAddr": remote,
+        return {"TimeReceived": received, "Direction": direction, "Route": route,
+                "LocalAddr": column(ipaddress.ip_address(local)), "RemoteAddr": column(ipaddress.ip_address(remote)),
                 "Proto": int(proto or 0), "LocalPort": lport, "RemotePort": rport, "RemoteAS": asn, "RemoteASName": org,
                 "RemoteCountry": country, "Bytes": int(pick(flow, "bytes", "Bytes", default=0)) * rate,
                 "Packets": int(pick(flow, "packets", "Packets", default=0)) * rate, "Flows": 1,
-                "ExporterAddress": ipv4(pick(flow, "sampler_address", "SamplerAddress", default="")),
+                "ExporterAddress": column(address(pick(flow, "sampler_address", "SamplerAddress", default=""))),
                 "InIf": in_if, "OutIf": out_if, "TCPFlags": int(pick(flow, "tcp_flags", "TCPFlags", default=0)) & 0xFF,
                 "SamplingRate": rate, "ServicePort": service_port(lport, rport)}
 
@@ -239,7 +265,7 @@ async def run() -> None:
     async def networks() -> None:
         while True:
             nets = await writer.local_networks()
-            EXTRA_LAN[:] = [n for n in nets if n.version == 4]
+            EXTRA_LAN[:] = nets
             await asyncio.sleep(60)
 
     tasks = [asyncio.create_task(periodic()), asyncio.create_task(report()), asyncio.create_task(georefresh()),

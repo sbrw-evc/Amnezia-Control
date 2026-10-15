@@ -77,9 +77,9 @@ API-слой — классы `HttpClient` и ресурсные API (`ClientsAp
 
 ```sql
 flows(TimeReceived DateTime, Direction Enum8('out','in','internal'), Route Enum8('direct','vpn'),
-      LocalAddr IPv4, RemoteAddr IPv4, Proto UInt8, LocalPort UInt16, RemotePort UInt16,
+      LocalAddr IPv6, RemoteAddr IPv6, Proto UInt8, LocalPort UInt16, RemotePort UInt16,
       RemoteAS UInt32, RemoteASName String, RemoteCountry String, Bytes UInt64, Packets UInt64, Flows UInt32,
-      ExporterAddress IPv4, InIf UInt32, OutIf UInt32, TCPFlags UInt8, SamplingRate UInt32, ServicePort UInt16)
+      ExporterAddress IPv6, InIf UInt32, OutIf UInt32, TCPFlags UInt8, SamplingRate UInt32, ServicePort UInt16)
 ENGINE = MergeTree PARTITION BY toYYYYMMDD(TimeReceived) TTL TimeReceived + INTERVAL 30 DAY
 
 flows_5m, flows_1h  ← MATERIALIZED VIEW (SummingMergeTree, 90 days / 2 years)

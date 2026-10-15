@@ -542,8 +542,8 @@ class DeviceService:
                                 note="Добавлен автоматически: маршрутизатор из ROUTER_HOST"))
 
     async def exporter_map(self) -> dict[str, dict]:
-        """Exporter IPv4 address → device, for flow enrichment: the configured exporter IP, the host and every
-        interface address."""
+        """Exporter address (IPv4 or IPv6) → device, for flow enrichment: the configured exporter IP, the host and
+        every interface address."""
         async with self._db.session() as s:
             rows = (await s.execute(select(NetworkDevice))).scalars().all()
         out: dict[str, dict] = {}
@@ -551,14 +551,15 @@ class DeviceService:
             addrs = [d.flow_exporter_ip, d.host] + [a.split("/")[0] for i in d.interfaces or [] for a in i.get("addresses") or []]
             for a in addrs:
                 ip = norm_ip(a)
-                if ip and ":" not in ip and ip not in out:
+                if ip and not ip.startswith("fe80:") and ip not in out:
                     out[ip] = {"id": str(d.id), "name": d.name,
                                "interfaces": [(i.get("index"), i.get("name"), i.get("speed_mbps") or 0)
                                               for i in d.interfaces or [] if i.get("index")]}
         return out
 
     async def local_networks(self) -> list[str]:
-        """Subnets of device interfaces with private addresses — treated as local by the flow collector."""
+        """Subnets of device interfaces treated as local by the flow collector: private IPv4 subnets and IPv6 LAN
+        prefixes (ULA and global /48–/64; link-local is always local in the collector)."""
         async with self._db.session() as s:
             rows = (await s.execute(select(NetworkDevice.interfaces))).scalars().all()
         nets = set()
@@ -569,6 +570,8 @@ class DeviceService:
                         n = ipaddress.ip_interface(a).network
                     except ValueError:
                         continue
-                    if n.version == 4 and n.is_private and 16 <= n.prefixlen <= 30 and not n.is_loopback:
+                    if n.is_loopback or n.is_link_local:
+                        continue
+                    if (n.version == 4 and n.is_private and 16 <= n.prefixlen <= 30) or (n.version == 6 and 48 <= n.prefixlen <= 64):
                         nets.add(str(n))
         return sorted(nets)

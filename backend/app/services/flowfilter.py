@@ -27,11 +27,38 @@ APP_EXPR = ("multiIf(Proto = 1, 'ICMP', Proto = 47, 'GRE', Proto = 50, 'IPsec ES
 FLAGS_EXPR = ("arrayStringConcat(arrayFilter(x -> x != '', [if(bitAnd(TCPFlags, 2) > 0, 'S', ''), "
               "if(bitAnd(TCPFlags, 16) > 0, 'A', ''), if(bitAnd(TCPFlags, 8) > 0, 'P', ''), "
               "if(bitAnd(TCPFlags, 1) > 0, 'F', ''), if(bitAnd(TCPFlags, 4) > 0, 'R', '')]), '')")
-EXPORTER_NAME = "dictGetOrDefault('flows.exporters', 'name', toUInt64(ExporterAddress), IPv4NumToString(ExporterAddress))"
+
+
+def ip_text(col: str) -> str:
+    """An address column (IPv6; IPv4 is kept as ::ffff:a.b.c.d) as text: IPv4 in dotted form, IPv6 as is."""
+    return f"replaceRegexpOne(IPv6NumToString({col}), '^::ffff:([0-9.]+)$', '\\\\1')"
+
+
+def ip_key(col: str) -> str:
+    """The key of the address-keyed dictionaries (hosts, exporters, ptr, if_names)."""
+    return f"tuple({ip_text(col)})"
+
+
+def remote_net(col: str) -> str:
+    """/24 of an IPv4 address, /64 of an IPv6 one."""
+    return (f"if(isIPv4String({ip_text(col)}), "
+            f"concat(IPv4NumToString(IPv4CIDRToRange(toIPv4({ip_text(col)}), 24).1), '/24'), "
+            f"concat(IPv6NumToString(IPv6CIDRToRange({col}, 64).1), '/64'))")
+
+
+def ch_ip(text: str) -> str:
+    """An address for toIPv6(): IPv4 as ::ffff:a.b.c.d (older ClickHouse versions do not map plain IPv4 text)."""
+    a = ipaddress.ip_address(text)
+    return f"::ffff:{a}" if a.version == 4 else str(a)
+
+
+# ExporterAddress of flows whose exporter is unknown.
+NO_EXPORTER = "ExporterAddress IN (toIPv6('::'), toIPv6('::ffff:0.0.0.0'))"
+EXPORTER_NAME = f"dictGetOrDefault('flows.exporters', 'name', {ip_key('ExporterAddress')}, {ip_text('ExporterAddress')})"
 
 
 def _ifname(col: str) -> str:
-    return (f"dictGetOrDefault('flows.if_names', 'name', (toUInt32(ExporterAddress), {col}), "
+    return (f"dictGetOrDefault('flows.if_names', 'name', ({ip_text('ExporterAddress')}, {col}), "
             f"if({col} = 0, '—', toString({col})))")
 
 
@@ -48,14 +75,13 @@ class Field:
 FIELDS: dict[str, Field] = {f.name.lower(): f for f in (
     Field("Direction", "enum", "Direction", "Направление", "toString(Direction)", True),
     Field("Route", "enum", "Route", "Маршрут", "toString(Route)", True),
-    Field("LocalAddr", "ip", "LocalAddr", "Локальный адрес", "IPv4NumToString(LocalAddr)", True),
-    Field("LocalHost", "string", "dictGetOrDefault('flows.hosts', 'name', toUInt64(LocalAddr), IPv4NumToString(LocalAddr))",
-          "Локальное устройство", "dictGetOrDefault('flows.hosts', 'name', toUInt64(LocalAddr), IPv4NumToString(LocalAddr))", True),
-    Field("RemoteAddr", "ip", "RemoteAddr", "Удалённый адрес", "IPv4NumToString(RemoteAddr)"),
-    Field("RemoteNet", "ip", "RemoteAddr", "Удалённая сеть /24",
-          "concat(IPv4NumToString(IPv4CIDRToRange(RemoteAddr, 24).1), '/24')"),
-    Field("RemoteHost", "string", "dictGetOrDefault('flows.ptr', 'name', toUInt64(RemoteAddr), '')", "Удалённый хост (PTR)",
-          "dictGetOrDefault('flows.ptr', 'name', toUInt64(RemoteAddr), IPv4NumToString(RemoteAddr))"),
+    Field("LocalAddr", "ip", "LocalAddr", "Локальный адрес", ip_text("LocalAddr"), True),
+    Field("LocalHost", "string", f"dictGetOrDefault('flows.hosts', 'name', {ip_key('LocalAddr')}, {ip_text('LocalAddr')})",
+          "Локальное устройство", f"dictGetOrDefault('flows.hosts', 'name', {ip_key('LocalAddr')}, {ip_text('LocalAddr')})", True),
+    Field("RemoteAddr", "ip", "RemoteAddr", "Удалённый адрес", ip_text("RemoteAddr")),
+    Field("RemoteNet", "ip", "RemoteAddr", "Удалённая сеть (/24, /64)", remote_net("RemoteAddr")),
+    Field("RemoteHost", "string", f"dictGetOrDefault('flows.ptr', 'name', {ip_key('RemoteAddr')}, '')", "Удалённый хост (PTR)",
+          f"dictGetOrDefault('flows.ptr', 'name', {ip_key('RemoteAddr')}, {ip_text('RemoteAddr')})"),
     Field("RemoteAS", "asn", "RemoteAS", "AS", "concat('AS', toString(RemoteAS), ' ', RemoteASName)", True),
     Field("RemoteASName", "string", "RemoteASName", "Организация AS", "RemoteASName", True),
     Field("RemoteCountry", "string", "RemoteCountry", "Страна", "RemoteCountry", True),
@@ -72,7 +98,7 @@ FIELDS: dict[str, Field] = {f.name.lower(): f for f in (
     Field("LocalPort", "port", "LocalPort", "Локальный порт", "toString(LocalPort)"),
     Field("RemotePort", "port", "RemotePort", "Удалённый порт", "toString(RemotePort)"),
     Field("TCPFlags", "port", "TCPFlags", "TCP-флаги", FLAGS_EXPR),
-    Field("Exporter", "ip", "ExporterAddress", "Экспортёр (адрес)", "IPv4NumToString(ExporterAddress)", True),
+    Field("Exporter", "ip", "ExporterAddress", "Экспортёр (адрес)", ip_text("ExporterAddress"), True),
     Field("ExporterName", "string", EXPORTER_NAME, "Экспортёр", EXPORTER_NAME, True),
     Field("InIfName", "string", _ifname("InIf"), "Входящий интерфейс", _ifname("InIf"), True),
     Field("OutIfName", "string", _ifname("OutIf"), "Исходящий интерфейс", _ifname("OutIf"), True),
@@ -204,11 +230,12 @@ class FilterParser:
             try:
                 net = ipaddress.ip_network(value, strict=False)
             except ValueError:
-                raise DomainError(f"Фильтр: «{value}» не IPv4-адрес или подсеть")
+                raise DomainError(f"Фильтр: «{value}» не IP-адрес или подсеть (IPv4 или IPv6)")
             if op not in ("=", "!="):
                 raise DomainError("Фильтр: для адресов доступны только = и !=")
-            expr = (f"isIPAddressInRange(IPv4NumToString({field.column}), {self._param(str(net), 'String')})"
-                    if net.prefixlen < 32 else f"{field.column} = toIPv4({self._param(str(net.network_address), 'String')})")
+            expr = (f"isIPAddressInRange({ip_text(field.column)}, {self._param(str(net), 'String')})"
+                    if net.prefixlen < net.max_prefixlen
+                    else f"{field.column} = toIPv6({self._param(ch_ip(str(net.network_address)), 'String')})")
             return expr if op == "=" else f"NOT ({expr})"
         if field.kind in ("asn", "port", "proto"):
             raw = value.lower()

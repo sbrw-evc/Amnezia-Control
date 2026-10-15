@@ -41,9 +41,11 @@ def _ios_flow(p: dict) -> list[str]:
     cmds = ["flow exporter NC-EXPORT", f" destination {p['collector']}", f" transport udp {p['port']}",
             f" export-protocol {proto}", " template data timeout 60", "exit",
             "flow monitor NC-MONITOR", " exporter NC-EXPORT", " record netflow ipv4 original-input",
+            " cache timeout active 60", "exit",
+            "flow monitor NC-MONITOR6", " exporter NC-EXPORT", " record netflow ipv6 original-input",
             " cache timeout active 60", "exit"]
     for i in p.get("interfaces") or []:
-        cmds += [f"interface {i}", " ip flow monitor NC-MONITOR input", "exit"]
+        cmds += [f"interface {i}", " ip flow monitor NC-MONITOR input", " ipv6 flow monitor NC-MONITOR6 input", "exit"]
     return cmds
 
 

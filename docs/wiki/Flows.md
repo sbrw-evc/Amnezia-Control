@@ -28,8 +28,12 @@ Enrichment in `flow-collector`:
 | `ServicePort` | the server-side port (the lower of the two ports), the base of the `Application` dimension |
 
 `Direction = internal` — traffic between two local addresses (inter-VLAN, LAN ↔ server); turn it off with
-`KEEP_INTERNAL=0` for the collector. Local networks are `LAN_CIDR` plus every private subnet found on the interfaces of
-managed devices (refreshed every minute). Excluded: tunnel transport to the VPS, multicast/broadcast.
+`KEEP_INTERNAL=0` for the collector. Local networks are `LAN_CIDR` plus every private IPv4 subnet and IPv6 LAN prefix
+(/48–/64) found on the interfaces of managed devices (refreshed every minute); IPv6 unique local (`fc00::/7`) and
+link-local (`fe80::/10`) addresses are always local. Excluded: tunnel transport to the VPS, multicast/broadcast.
+
+IPv4 and IPv6 flows are collected alike. Addresses are stored in `IPv6` columns (IPv4 as `::ffff:a.b.c.d`) and shown in
+their usual form; an installation upgraded from 2.0 converts its tables at the first start.
 Site attribution happens at query time through the ClickHouse dictionary `sites` (`ip_trie`), which is filled when
 `ip-list.json` is uploaded and custom prefixes are added — so a new mapping applies to existing data as well.
 
@@ -62,7 +66,7 @@ All options are kept in the URL — you can share a link. `Ctrl+Enter` applies.
 
 ### Dimensions
 
-`Direction`, `Route`, `LocalAddr`, `LocalHost` (client name), `RemoteAddr`, `RemoteNet` (/24), `RemoteHost` (PTR),
+`Direction`, `Route`, `LocalAddr`, `LocalHost` (client name), `RemoteAddr`, `RemoteNet` (/24 for IPv4, /64 for IPv6), `RemoteHost` (PTR),
 `RemoteAS`, `RemoteASName`, `RemoteCountry`, `Site`, `SiteGroup`, `Threat`, `Proto`, `Application`, `ServicePort`,
 `LocalPort`, `RemotePort`, `TCPFlags`, `Exporter`, `ExporterName`, `InIfName`, `OutIfName`.
 
@@ -87,7 +91,7 @@ expression := condition | NOT expression | (expression) | expression AND express
 
 | Field type | Operators | Values |
 |---|---|---|
-| Address (`LocalAddr`, `RemoteAddr`, `RemoteNet`) | `=`, `!=` | `203.0.113.5`, `203.0.113.0/24` |
+| Address (`LocalAddr`, `RemoteAddr`, `RemoteNet`, `Exporter`) | `=`, `!=` | `203.0.113.5`, `203.0.113.0/24`, `2001:db8::5`, `2001:db8::/48` |
 | AS (`RemoteAS`) | `=`, `!=`, `<`, `<=`, `>`, `>=`, `IN` | `AS13335` or `13335` |
 | Port, protocol | numeric, `IN` | `443`; protocol — `tcp`, `udp`, `icmp` or a number |
 | Strings (`Site`, `RemoteCountry`, `RemoteASName`, `SiteGroup`) and `Direction`, `Route` | `=`, `!=`, `IN`, `NOTIN`, `LIKE`, `UNLIKE`, `ILIKE`, `IUNLIKE` | `vpn`, `'%google%'` |

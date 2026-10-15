@@ -29,8 +29,12 @@ FortiGate, sFlow HPE / Aruba и другие. Действие **Экспорт 
 | `ServicePort` | порт серверной стороны (меньший из двух), основа измерения `Application` |
 
 `Direction = internal` — трафик между двумя локальными адресами (между VLAN, LAN ↔ сервер); отключается
-`KEEP_INTERNAL=0` у коллектора. Локальные сети — `LAN_CIDR` и все частные подсети с интерфейсов управляемых устройств
-(обновляются раз в минуту). Исключаются: транспорт туннеля к VPS, multicast/broadcast.
+`KEEP_INTERNAL=0` у коллектора. Локальные сети — `LAN_CIDR`, все частные подсети IPv4 и префиксы IPv6 (/48–/64) с
+интерфейсов управляемых устройств (обновляются раз в минуту); уникальные локальные (`fc00::/7`) и link-local
+(`fe80::/10`) адреса IPv6 всегда локальные. Исключаются: транспорт туннеля к VPS, multicast/broadcast.
+
+Потоки IPv4 и IPv6 собираются одинаково. Адреса хранятся в колонках `IPv6` (IPv4 — как `::ffff:a.b.c.d`) и показываются
+в привычном виде; установка, обновлённая с 2.0, преобразует таблицы при первом запуске.
 Атрибуция сайтов выполняется при запросе через словарь ClickHouse `sites` (`ip_trie`), который заполняется при
 загрузке `ip-list.json` и добавлении своих подсетей — поэтому новое разбиение применяется и к старым данным.
 
@@ -63,7 +67,7 @@ FortiGate, sFlow HPE / Aruba и другие. Действие **Экспорт 
 
 ### Измерения
 
-`Direction`, `Route`, `LocalAddr`, `LocalHost` (имя клиента), `RemoteAddr`, `RemoteNet` (/24), `RemoteHost` (PTR),
+`Direction`, `Route`, `LocalAddr`, `LocalHost` (имя клиента), `RemoteAddr`, `RemoteNet` (/24 для IPv4, /64 для IPv6), `RemoteHost` (PTR),
 `RemoteAS`, `RemoteASName`, `RemoteCountry`, `Site`, `SiteGroup`, `Threat`, `Proto`, `Application`, `ServicePort`,
 `LocalPort`, `RemotePort`, `TCPFlags`, `Exporter`, `ExporterName`, `InIfName`, `OutIfName`.
 
@@ -88,7 +92,7 @@ FortiGate, sFlow HPE / Aruba и другие. Действие **Экспорт 
 
 | Тип поля | Операторы | Значения |
 |---|---|---|
-| Адрес (`LocalAddr`, `RemoteAddr`, `RemoteNet`) | `=`, `!=` | `203.0.113.5`, `203.0.113.0/24` |
+| Адрес (`LocalAddr`, `RemoteAddr`, `RemoteNet`, `Exporter`) | `=`, `!=` | `203.0.113.5`, `203.0.113.0/24`, `2001:db8::5`, `2001:db8::/48` |
 | AS (`RemoteAS`) | `=`, `!=`, `<`, `<=`, `>`, `>=`, `IN` | `AS13335` или `13335` |
 | Порт, протокол | числовые, `IN` | `443`; протокол — `tcp`, `udp`, `icmp` или номер |
 | Строки (`Site`, `RemoteCountry`, `RemoteASName`, `SiteGroup`) и `Direction`, `Route` | `=`, `!=`, `IN`, `NOTIN`, `LIKE`, `UNLIKE`, `ILIKE`, `IUNLIKE` | `vpn`, `'%google%'` |

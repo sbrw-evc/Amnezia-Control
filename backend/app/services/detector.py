@@ -20,7 +20,7 @@ from ..domain.models import Severity
 from .alerts import AlertService
 from .audit import AuditService
 from .common import Actor, utcnow
-from .flowfilter import FIELDS, FilterParser, dimension
+from .flowfilter import FIELDS, NO_EXPORTER, FilterParser, ch_ip, dimension, ip_text
 
 log = logging.getLogger(__name__)
 
@@ -247,7 +247,7 @@ class Detector:
     async def _k_ddos_volumetric(self, p, where, params, ftext):
         w = int(p["window"])
         rows = await self._q(
-            f"SELECT IPv4NumToString(LocalAddr) AS ip, {FIELDS['localhost'].column} AS host, sum(Bytes) * 8 / {w} AS bps, "
+            f"SELECT {ip_text('LocalAddr')} AS ip, {FIELDS['localhost'].column} AS host, sum(Bytes) * 8 / {w} AS bps, "
             f"sum(Packets) / {w} AS pps, uniqExact(RemoteAddr) AS sources FROM flows "
             f"WHERE TimeReceived >= now() - {w} AND Direction = 'in' AND ({where}) GROUP BY ip, host "
             f"HAVING bps >= {float(p['bps'])} OR pps >= {float(p['pps'])} ORDER BY bps DESC LIMIT {MAX_GROUPS}", params)
@@ -255,9 +255,9 @@ class Detector:
         if rows and float(p.get("k") or 0) > 0:
             bw = int(p["baseline_window"])
             for b in await self._q(
-                    f"SELECT IPv4NumToString(LocalAddr) AS ip, sum(Bytes) * 8 / {bw} AS bps FROM flows "
+                    f"SELECT {ip_text('LocalAddr')} AS ip, sum(Bytes) * 8 / {bw} AS bps FROM flows "
                     f"WHERE TimeReceived >= now() - {w + bw} AND TimeReceived < now() - {w} AND Direction = 'in' "
-                    f"AND LocalAddr IN ({', '.join(repr(r['ip']) for r in rows)}) GROUP BY ip", {}):
+                    f"AND LocalAddr IN ({', '.join('toIPv6(' + repr(ch_ip(r['ip'])) + ')' for r in rows)}) GROUP BY ip", {}):
                 base[b["ip"]] = float(b["bps"])
         out = {}
         for r in rows:
@@ -274,7 +274,7 @@ class Detector:
         w = int(p["window"])
         syn = "bitAnd(TCPFlags, 2) = 2 AND bitAnd(TCPFlags, 16) = 0"
         rows = await self._q(
-            f"SELECT IPv4NumToString(LocalAddr) AS ip, sumIf(Packets, {syn}) / {w} AS syn_pps, "
+            f"SELECT {ip_text('LocalAddr')} AS ip, sumIf(Packets, {syn}) / {w} AS syn_pps, "
             f"sumIf(Packets, {syn}) / greatest(sum(Packets), 1) AS ratio, uniqExactIf(RemoteAddr, {syn}) AS sources "
             f"FROM flows WHERE TimeReceived >= now() - {w} AND Direction = 'in' AND Proto = 6 AND ({where}) "
             f"GROUP BY ip HAVING syn_pps >= {float(p['pps'])} AND ratio >= {float(p['ratio'])} "
@@ -289,7 +289,7 @@ class Detector:
         w = int(p["window"])
         if p.get("mode") == "outbound":
             rows = await self._q(
-                f"SELECT IPv4NumToString(LocalAddr) AS ip, {FIELDS['localhost'].column} AS host, "
+                f"SELECT {ip_text('LocalAddr')} AS ip, {FIELDS['localhost'].column} AS host, "
                 f"uniqExact(RemoteAddr) AS hosts, uniqExact(RemotePort) AS ports FROM flows "
                 f"WHERE TimeReceived >= now() - {w} AND Direction = 'out' AND ({where}) GROUP BY ip, host "
                 f"HAVING hosts >= {int(p['hosts'])} ORDER BY hosts DESC LIMIT {MAX_GROUPS}", params)
@@ -298,7 +298,7 @@ class Detector:
                               "link": flows_link(self._and(ftext, f"LocalAddr = {r['ip']}"), ["RemotePort", "RemoteCountry"])}
                     for r in rows}
         rows = await self._q(
-            f"SELECT IPv4NumToString(RemoteAddr) AS ip, any(RemoteCountry) AS country, any(RemoteASName) AS asname, "
+            f"SELECT {ip_text('RemoteAddr')} AS ip, any(RemoteCountry) AS country, any(RemoteASName) AS asname, "
             f"uniqExact(LocalPort) AS ports, uniqExact(LocalAddr) AS hosts FROM flows "
             f"WHERE TimeReceived >= now() - {w} AND Direction = 'in' AND ({where}) GROUP BY ip "
             f"HAVING ports >= {int(p['ports'])} OR hosts >= {int(p['hosts'])} ORDER BY ports DESC LIMIT {MAX_GROUPS}", params)
@@ -373,9 +373,9 @@ class Detector:
     async def _k_exporter_silent(self, p, where, params, ftext):
         m = int(p.get("minutes", 10))
         rows = await self._q(
-            f"SELECT IPv4NumToString(ExporterAddress) AS ip, {FIELDS['exportername'].column} AS name, "
+            f"SELECT {ip_text('ExporterAddress')} AS ip, {FIELDS['exportername'].column} AS name, "
             f"toString(max(TimeReceived)) AS last FROM flows WHERE TimeReceived >= now() - 86400 "
-            f"AND ExporterAddress != toIPv4('0.0.0.0') GROUP BY ip, name HAVING max(TimeReceived) < now() - {m * 60}", {})
+            f"AND NOT ({NO_EXPORTER}) GROUP BY ip, name HAVING max(TimeReceived) < now() - {m * 60}", {})
         return {r["ip"]: {"label": r["name"], "value": 0,
                           "text": f"нет потоков с {r['last']} UTC (дольше {m} мин)", "link": "/flows?tab=exporters"}
                 for r in rows}
@@ -384,8 +384,8 @@ class Detector:
         w = int(p["window"])
         col = FIELDS["threat"].column
         rows = await self._q(
-            f"SELECT {col} AS list, IPv4NumToString(LocalAddr) AS ip, {FIELDS['localhost'].column} AS host, "
-            f"groupUniqArray(5)(IPv4NumToString(RemoteAddr)) AS remotes, sum(Flows) AS flows, sum(Bytes) AS bytes "
+            f"SELECT {col} AS list, {ip_text('LocalAddr')} AS ip, {FIELDS['localhost'].column} AS host, "
+            f"groupUniqArray(5)({ip_text('RemoteAddr')}) AS remotes, sum(Flows) AS flows, sum(Bytes) AS bytes "
             f"FROM flows WHERE TimeReceived >= now() - {w} AND {col} != '' AND ({where}) GROUP BY list, ip, host "
             f"HAVING flows >= {int(p.get('min_flows', 1))} ORDER BY flows DESC LIMIT {MAX_GROUPS}", params)
         return {f"{r['list']}|{r['ip']}": {
@@ -397,9 +397,9 @@ class Detector:
     async def _k_link_utilization(self, p, where, params, ftext):
         w = int(p["window"])
         rows = await self._q(
-            "SELECT IPv4NumToString(ea) AS ip, idx, dir, "
-            "dictGetOrDefault('flows.if_names', 'name', (toUInt32(ea), idx), toString(idx)) AS name, "
-            "dictGetOrDefault('flows.if_names', 'speed', (toUInt32(ea), idx), toUInt64(0)) AS speed, "
+            f"SELECT {ip_text('ea')} AS ip, idx, dir, "
+            f"dictGetOrDefault('flows.if_names', 'name', ({ip_text('ea')}, idx), toString(idx)) AS name, "
+            f"dictGetOrDefault('flows.if_names', 'speed', ({ip_text('ea')}, idx), toUInt64(0)) AS speed, "
             f"{FIELDS['exportername'].column.replace('ExporterAddress', 'ea')} AS exporter, sum(b) * 8 / {w} AS bps FROM ("
             f"SELECT ExporterAddress AS ea, InIf AS idx, 'in' AS dir, Bytes AS b FROM flows WHERE TimeReceived >= now() - {w} "
             f"AND InIf != 0 AND ({where}) UNION ALL SELECT ExporterAddress AS ea, OutIf AS idx, 'out' AS dir, Bytes AS b "

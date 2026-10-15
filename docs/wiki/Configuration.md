@@ -14,7 +14,7 @@
 | `KEEP_INTERNAL` | `1` | Collector: keep flows between two local addresses (`Direction = internal`) |
 | `ROUTER_SSH_USER` | `admin` | SSH user on MikroTik |
 | `GATEWAY_IP` | `192.168.0.210` | LAN address of the gateway (the Docker host) |
-| `LAN_CIDR` | `192.168.0.0/24` | Local network (used to classify flows) |
+| `LAN_CIDR` | `192.168.0.0/24` | Local networks for classifying flows, comma-separated; IPv6 prefixes are allowed (`192.168.0.0/24,2001:db8:10::/64`) |
 | `LAN_IF` | `eth0` | LAN interface of the gateway host |
 | `TUNNEL_NET` | `10.8.1.0/24` | AmneziaWG tunnel network |
 | `MT_WG_IFACE` | `wg-nc` | WireGuard interface on MikroTik (see [[MikroTik-VPN]]) |

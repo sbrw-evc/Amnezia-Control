@@ -17,7 +17,7 @@ from ..db.repositories import SavedFilterRepo
 from ..domain.errors import DomainError
 from .audit import AuditService
 from .common import Actor, utcnow
-from .flowfilter import EXPORTER_NAME as EXPORTER_NAME_SQL, FIELDS, FilterParser, dimension
+from .flowfilter import EXPORTER_NAME as EXPORTER_NAME_SQL, FIELDS, FilterParser, dimension, ip_key, ip_text
 
 UNITS = {"bps": ("Bytes * 8", "бит/с"), "pps": ("Packets", "пакетов/с"), "fps": ("Flows", "потоков/с")}
 LIMIT_TYPES = ("avg", "max", "last")
@@ -59,8 +59,8 @@ class FlowSchema:
                 TimeReceived DateTime CODEC(DoubleDelta, LZ4),
                 Direction Enum8('out' = 1, 'in' = 2, 'internal' = 3),
                 Route Enum8('direct' = 1, 'vpn' = 2),
-                LocalAddr IPv4,
-                RemoteAddr IPv4,
+                LocalAddr IPv6,
+                RemoteAddr IPv6,
                 Proto UInt8,
                 LocalPort UInt16,
                 RemotePort UInt16,
@@ -70,7 +70,7 @@ class FlowSchema:
                 Bytes UInt64,
                 Packets UInt64,
                 Flows UInt32 DEFAULT 1,
-                ExporterAddress IPv4 DEFAULT toIPv4('0.0.0.0'),
+                ExporterAddress IPv6 DEFAULT toIPv6('::ffff:0.0.0.0'),
                 InIf UInt32 DEFAULT 0,
                 OutIf UInt32 DEFAULT 0,
                 TCPFlags UInt8 DEFAULT 0,
@@ -83,7 +83,7 @@ class FlowSchema:
         await self._ch.command(f"ALTER TABLE {db}.flows MODIFY TTL TimeReceived + INTERVAL {int(ttl_days)} DAY")
         # columns added after 1.0: old parts compute them from the DEFAULT expressions
         await self._ch.command(
-            f"ALTER TABLE {db}.flows ADD COLUMN IF NOT EXISTS ExporterAddress IPv4 DEFAULT toIPv4('0.0.0.0'), "
+            f"ALTER TABLE {db}.flows ADD COLUMN IF NOT EXISTS ExporterAddress IPv6 DEFAULT toIPv6('::ffff:0.0.0.0'), "
             "ADD COLUMN IF NOT EXISTS InIf UInt32 DEFAULT 0, ADD COLUMN IF NOT EXISTS OutIf UInt32 DEFAULT 0, "
             "ADD COLUMN IF NOT EXISTS TCPFlags UInt8 DEFAULT 0, ADD COLUMN IF NOT EXISTS SamplingRate UInt32 DEFAULT 1, "
             f"ADD COLUMN IF NOT EXISTS ServicePort UInt16 DEFAULT {SERVICE_PORT}")
@@ -93,6 +93,8 @@ class FlowSchema:
             await self._ch.command(f"ALTER TABLE {db}.flows MODIFY COLUMN Direction "
                                    "Enum8('out' = 1, 'in' = 2, 'internal' = 3)")
 
+        renamed = await self._migrate_ipv6(db)
+
         cols = ", ".join(AGG_COLUMNS)
         for table, (step, ttl) in AGG_TABLES.items():
             exists = await self._ch.query(f"SELECT count() AS n FROM system.tables WHERE database = currentDatabase() "
@@ -100,8 +102,8 @@ class FlowSchema:
             await self._ch.command(f"""
                 CREATE TABLE IF NOT EXISTS {db}.{table} (
                     TimeReceived DateTime, Direction Enum8('out' = 1, 'in' = 2, 'internal' = 3),
-                    Route Enum8('direct' = 1, 'vpn' = 2), ExporterAddress IPv4, InIf UInt32, OutIf UInt32,
-                    LocalAddr IPv4, RemoteAS UInt32, RemoteASName LowCardinality(String),
+                    Route Enum8('direct' = 1, 'vpn' = 2), ExporterAddress IPv6, InIf UInt32, OutIf UInt32,
+                    LocalAddr IPv6, RemoteAS UInt32, RemoteASName LowCardinality(String),
                     RemoteCountry LowCardinality(String), Proto UInt8, ServicePort UInt16,
                     Bytes UInt64, Packets UInt64, Flows UInt64
                 ) ENGINE = SummingMergeTree((Bytes, Packets, Flows))
@@ -112,7 +114,11 @@ class FlowSchema:
                       f"sum(Flows) AS Flows FROM (SELECT toStartOfInterval(TimeReceived, INTERVAL {step} SECOND) AS t, "
                       f"{cols}, Bytes, Packets, Flows FROM {db}.flows) GROUP BY t, {cols}")
             await self._ch.command(f"CREATE MATERIALIZED VIEW IF NOT EXISTS {db}.{table}_mv TO {db}.{table} AS {select}")
-            if not int(exists[0]["n"]):
+            if table in renamed:
+                await self._ch.command(f"INSERT INTO {db}.{table} (TimeReceived, {cols}, Bytes, Packets, Flows) "
+                                       f"SELECT TimeReceived, {cols}, Bytes, Packets, Flows FROM {db}.{table}_v4")
+                await self._ch.command(f"DROP TABLE {db}.{table}_v4")
+            elif not int(exists[0]["n"]):
                 await self._ch.command(f"INSERT INTO {db}.{table} {select}")
 
         await self._ch.command(f"""
@@ -129,18 +135,53 @@ class FlowSchema:
             PRIMARY KEY prefix {self._source('threat_prefixes')} LAYOUT(IP_TRIE()) LIFETIME(MIN 300 MAX 600)""")
         for table, attrs in (("hosts", "name String, mac String"), ("exporters", "name String, device_id String"),
                              ("ptr", "name String")):
-            # a dictionary cannot share its name with a table: data lives in <name>_data
-            await self._ch.command(f"CREATE TABLE IF NOT EXISTS {db}.{table}_data (addr UInt64, {attrs}) "
+            # a dictionary cannot share its name with a table: data lives in <name>_data. The key is the address as
+            # text (IPv4 dotted, IPv6 as is), so both families are looked up the same way.
+            await self._ch.command(f"CREATE TABLE IF NOT EXISTS {db}.{table}_data (addr String, {attrs}) "
                                    "ENGINE = ReplacingMergeTree ORDER BY addr")
-            await self._ch.command(f"CREATE DICTIONARY IF NOT EXISTS {db}.{table} (addr UInt64, {attrs}) PRIMARY KEY addr "
-                                   f"{self._source(table + '_data')} LAYOUT(HASHED()) LIFETIME(MIN 60 MAX 180)")
-        await self._ch.command(f"CREATE TABLE IF NOT EXISTS {db}.if_names_data (addr UInt32, idx UInt32, name String, "
+            await self._ch.command(f"CREATE DICTIONARY IF NOT EXISTS {db}.{table} (addr String, {attrs}) PRIMARY KEY addr "
+                                   f"{self._source(table + '_data')} LAYOUT(COMPLEX_KEY_HASHED()) LIFETIME(MIN 60 MAX 180)")
+        await self._ch.command(f"CREATE TABLE IF NOT EXISTS {db}.if_names_data (addr String, idx UInt32, name String, "
                                "speed UInt64) ENGINE = ReplacingMergeTree ORDER BY (addr, idx)")
-        await self._ch.command(f"CREATE DICTIONARY IF NOT EXISTS {db}.if_names (addr UInt32, idx UInt32, name String, "
+        await self._ch.command(f"CREATE DICTIONARY IF NOT EXISTS {db}.if_names (addr String, idx UInt32, name String, "
                                f"speed UInt64) PRIMARY KEY addr, idx {self._source('if_names_data')} "
                                "LAYOUT(COMPLEX_KEY_HASHED()) LIFETIME(MIN 60 MAX 180)")
         await self._ch.command(f"CREATE TABLE IF NOT EXISTS {db}.local_networks (prefix String) "
                                "ENGINE = ReplacingMergeTree ORDER BY prefix")
+
+
+
+    async def _column_type(self, table: str, column: str) -> str:
+        rows = await self._ch.query("SELECT type FROM system.columns WHERE database = currentDatabase() "
+                                    f"AND table = '{table}' AND name = '{column}'")
+        return rows[0]["type"] if rows else ""
+
+    async def _migrate_ipv6(self, db: str) -> set[str]:
+        """Up to 2.0 addresses were IPv4 columns and IPv6 flows were dropped by the collector. Addresses become IPv6
+        columns (IPv4 kept as ::ffff:a.b.c.d); the aggregates have them in the sorting key, so they are rebuilt; the
+        address-keyed dictionaries are recreated with text keys (the backend refills them within a minute)."""
+        if await self._column_type("flows", "LocalAddr") == "IPv4":
+            for table in AGG_TABLES:
+                await self._ch.command(f"DROP VIEW IF EXISTS {db}.{table}_mv")
+            await self._ch.command(
+                f"ALTER TABLE {db}.flows MODIFY COLUMN LocalAddr IPv6, MODIFY COLUMN RemoteAddr IPv6, "
+                "MODIFY COLUMN ExporterAddress IPv6 DEFAULT toIPv6('::ffff:0.0.0.0')")
+        renamed = set()
+        for table in AGG_TABLES:
+            # a copy interrupted by a restart is finished on the next start
+            if await self._column_type(f"{table}_v4", "LocalAddr"):
+                renamed.add(table)
+            if await self._column_type(table, "LocalAddr") != "IPv4" or table in renamed:
+                continue
+            # the address is in the sorting key: ensure() creates the table anew and copies the old rows into it
+            await self._ch.command(f"DROP VIEW IF EXISTS {db}.{table}_mv")
+            await self._ch.command(f"RENAME TABLE {db}.{table} TO {db}.{table}_v4")
+            renamed.add(table)
+        for table in ("hosts", "exporters", "ptr", "if_names"):
+            if await self._column_type(f"{table}_data", "addr") not in ("", "String"):
+                await self._ch.command(f"DROP DICTIONARY IF EXISTS {db}.{table}")
+                await self._ch.command(f"DROP TABLE IF EXISTS {db}.{table}_data")
+        return renamed
 
 
 class FlowService:
@@ -212,7 +253,7 @@ class FlowService:
     def _records_sql(where: str, limit: int) -> str:
         return (
             "SELECT TimeReceived, toString(Direction) AS Direction, toString(Route) AS Route, "
-            "IPv4NumToString(LocalAddr) AS LocalAddr, IPv4NumToString(RemoteAddr) AS RemoteAddr, Protocol, "
+            f"{ip_text('LocalAddr')} AS LocalAddr, {ip_text('RemoteAddr')} AS RemoteAddr, Protocol, "
             "LocalPort, RemotePort, RemoteAS, RemoteASName, RemoteCountry, Site, Bytes, Packets, LocalHost, Application, "
             "Exporter, InIfName, OutIfName, Flags, Threat, RemoteHost FROM ("
             f"SELECT *, {FIELDS['proto'].dimension} AS Protocol, {FIELDS['site'].dimension} AS Site, "
@@ -397,7 +438,7 @@ class FlowService:
     # ---------- live traffic for the map ----------
     async def local_traffic(self, seconds: int = 300) -> list[dict]:
         rows = await self._ch.query(
-            f"SELECT IPv4NumToString(LocalAddr) AS ip, sum(Bytes) * 8 / {int(seconds)} AS bps, "
+            f"SELECT {ip_text('LocalAddr')} AS ip, sum(Bytes) * 8 / {int(seconds)} AS bps, "
             f"sumIf(Bytes, Direction = 'in') * 8 / {int(seconds)} AS in_bps, "
             f"sumIf(Bytes, Direction = 'out') * 8 / {int(seconds)} AS out_bps FROM flows "
             f"WHERE TimeReceived >= now() - {int(seconds)} GROUP BY ip ORDER BY bps DESC LIMIT 5000")
@@ -407,14 +448,14 @@ class FlowService:
     # ---------- exporters ----------
     async def exporters(self) -> list[dict]:
         rows = await self._ch.query(
-            f"SELECT IPv4NumToString(ExporterAddress) AS addr, {EXPORTER_NAME_SQL} AS name, "
+            f"SELECT {ip_text('ExporterAddress')} AS addr, {EXPORTER_NAME_SQL} AS name, "
             "countIf(TimeReceived >= now() - 300) / 300 AS fps, sumIf(Bytes, TimeReceived >= now() - 300) * 8 / 300 AS bps, "
             "max(TimeReceived) AS last_seen, count() AS flows, round(avg(SamplingRate)) AS sampling "
             "FROM flows WHERE TimeReceived >= now() - 86400 GROUP BY addr, name ORDER BY bps DESC")
         ifs = await self._ch.query(
-            "SELECT IPv4NumToString(ea) AS addr, idx, "
-            "dictGetOrDefault('flows.if_names', 'name', (toUInt32(ea), idx), toString(idx)) AS name, "
-            "dictGetOrDefault('flows.if_names', 'speed', (toUInt32(ea), idx), toUInt64(0)) AS speed, "
+            f"SELECT {ip_text('ea')} AS addr, idx, "
+            f"dictGetOrDefault('flows.if_names', 'name', ({ip_text('ea')}, idx), toString(idx)) AS name, "
+            f"dictGetOrDefault('flows.if_names', 'speed', ({ip_text('ea')}, idx), toUInt64(0)) AS speed, "
             "sum(i) * 8 / 300 AS in_bps, sum(o) * 8 / 300 AS out_bps FROM ("
             "SELECT ExporterAddress AS ea, InIf AS idx, Bytes AS i, toUInt64(0) AS o FROM flows "
             "WHERE TimeReceived >= now() - 300 AND InIf != 0 UNION ALL "
@@ -444,19 +485,19 @@ class FlowService:
 
     async def sync_enrichment(self, exporters: dict[str, dict], hosts: list[dict], local_nets: list[str]) -> None:
         """Exporter names, interface names / speeds by ifIndex, LAN host names and local subnets for the collector."""
-        await self._replace("exporters", [{"addr": _ip_int(ip), "name": e["name"], "device_id": e["id"]}
+        await self._replace("exporters", [{"addr": _ip_text(ip), "name": e["name"], "device_id": e["id"]}
                                           for ip, e in exporters.items()])
-        await self._replace("if_names", [{"addr": _ip_int(ip), "idx": int(idx), "name": str(name), "speed": int(speed or 0)}
+        await self._replace("if_names", [{"addr": _ip_text(ip), "idx": int(idx), "name": str(name), "speed": int(speed or 0)}
                                          for ip, e in exporters.items() for idx, name, speed in e["interfaces"]])
-        await self._replace("hosts", [{"addr": _ip_int(h["ip"]), "name": h["name"], "mac": h["mac"]} for h in hosts
-                                      if h.get("ip") and ":" not in h["ip"]])
+        await self._replace("hosts", [{"addr": _ip_text(h["ip"]), "name": h["name"], "mac": h["mac"]} for h in hosts
+                                      if h.get("ip")])
         await self._replace("local_networks", [{"prefix": n} for n in local_nets])
 
     # ---------- reverse DNS ----------
     async def refresh_ptr(self, limit: int = 300) -> int:
         rows = await self._ch.query(
-            "SELECT IPv4NumToString(RemoteAddr) AS ip FROM flows WHERE TimeReceived >= now() - 3600 "
-            "AND dictGetOrDefault('flows.ptr', 'name', toUInt64(RemoteAddr), '') = '' "
+            f"SELECT {ip_text('RemoteAddr')} AS ip FROM flows WHERE TimeReceived >= now() - 3600 "
+            f"AND dictGetOrDefault('flows.ptr', 'name', {ip_key('RemoteAddr')}, '') = '' "
             f"GROUP BY ip ORDER BY sum(Bytes) DESC LIMIT {int(limit)}")
         loop = asyncio.get_running_loop()
         sem = asyncio.Semaphore(20)
@@ -467,7 +508,7 @@ class FlowService:
                     host, _ = await asyncio.wait_for(loop.getnameinfo((ip, 0), socket.NI_NAMEREQD), 3)
                 except (OSError, asyncio.TimeoutError):
                     host = "—"
-                return {"addr": _ip_int(ip), "name": host[:253]}
+                return {"addr": _ip_text(ip), "name": host[:253]}
 
         found = await asyncio.gather(*(one(r["ip"]) for r in rows))
         if found:
@@ -494,7 +535,8 @@ class FlowService:
                     continue
                 count = 0
                 for net in parse_blocklist(r.text):
-                    if net.is_private or net.is_reserved or net.is_loopback or net.is_multicast or net.prefixlen < 8 \
+                    if net.is_private or net.is_reserved or net.is_loopback or net.is_multicast or net.is_link_local \
+                            or net.prefixlen < (8 if net.version == 4 else 19) \
                             or any(net.overlaps(x) for x in excluded):
                         continue
                     rows.append({"prefix": str(net), "list": lst["name"]})
@@ -509,8 +551,8 @@ class FlowService:
 
     async def threat_contacts(self, hours: int = 24) -> list[dict]:
         rows = await self._ch.query(
-            f"SELECT {FIELDS['threat'].column} AS list, IPv4NumToString(LocalAddr) AS local, "
-            f"{FIELDS['localhost'].column} AS host, IPv4NumToString(RemoteAddr) AS remote, any(RemoteCountry) AS country, "
+            f"SELECT {FIELDS['threat'].column} AS list, {ip_text('LocalAddr')} AS local, "
+            f"{FIELDS['localhost'].column} AS host, {ip_text('RemoteAddr')} AS remote, any(RemoteCountry) AS country, "
             "any(RemoteASName) AS asname, toString(any(Direction)) AS direction, sum(Bytes) AS bytes, sum(Flows) AS flows, "
             f"max(TimeReceived) AS last_seen FROM flows WHERE TimeReceived >= now() - {int(hours) * 3600} "
             f"AND {FIELDS['threat'].column} != '' GROUP BY list, local, host, remote ORDER BY last_seen DESC LIMIT 500")
@@ -543,8 +585,12 @@ class FlowService:
             await s.delete(v)
 
 
-def _ip_int(ip: str) -> int:
-    return int(ipaddress.ip_address(ip))
+def _ip_text(ip: str) -> str:
+    """The dictionary key of an address: as ip_text() renders the column (IPv4 dotted, IPv6 compressed)."""
+    a = ipaddress.ip_address(str(ip).split("%")[0])
+    if a.version == 6 and a.ipv4_mapped:
+        a = a.ipv4_mapped
+    return str(a)
 
 
 def parse_blocklist(text: str):
@@ -566,14 +612,15 @@ def parse_blocklist(text: str):
             net = ipaddress.ip_network(cidr.strip(), strict=False)
         except ValueError:
             continue
-        if net.version == 4:
-            yield net
+        yield net
 
 
 DEFAULT_THREAT_LISTS = [
     {"name": "firehol_level1", "url": "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
      "enabled": True, "terms": "https://iplists.firehol.org/?ipset=firehol_level1"},
     {"name": "spamhaus_drop", "url": "https://www.spamhaus.org/drop/drop_v4.json", "enabled": True,
+     "terms": "https://www.spamhaus.org/blocklists/do-not-route-or-peer/"},
+    {"name": "spamhaus_drop_v6", "url": "https://www.spamhaus.org/drop/drop_v6.json", "enabled": True,
      "terms": "https://www.spamhaus.org/blocklists/do-not-route-or-peer/"},
     {"name": "feodo", "url": "https://feodotracker.abuse.ch/downloads/ipblocklist.txt", "enabled": True,
      "terms": "https://feodotracker.abuse.ch/ (CC0)"},
