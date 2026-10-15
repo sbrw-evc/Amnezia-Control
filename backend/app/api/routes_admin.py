@@ -35,7 +35,7 @@ async def tokens(_: Principal = Depends(admin), c: Container = Depends(container
 
 @router.post("/tokens")
 async def token_create(body: TokenIn, p: Principal = Depends(admin), c: Container = Depends(container)):
-    return await c.tokens.create(p.actor, body.name, body.role, body.days)
+    return await c.tokens.create(p.actor, p.owner_id, body.name, body.role, body.days)
 
 
 @router.delete("/tokens/{token_id}")

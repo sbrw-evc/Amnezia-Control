@@ -20,6 +20,7 @@ from .services.alerts import AlertService
 from .services.analytics import AnalyticsService
 from .services.audit import AuditService
 from .services.auth import AuthService
+from .services.identity.spa import SYNC_SECONDS, SpaService
 from .services.backends import AmneziaBackend, MikrotikBackend
 from .services.backups import BackupService
 from .services.clients import VpnClientService
@@ -42,6 +43,7 @@ from .workers import PeriodicJob, Scheduler
 log = logging.getLogger(__name__)
 STARTUP_LOCK_KEY = 7_331_003
 MT_LOCK_KEY = 7_331_004
+SPA_LOCK_KEY = 7_331_005
 
 
 class Container:
@@ -68,9 +70,12 @@ class Container:
         self.notifier = TelegramNotifier(self.secrets, lambda: self.settings.get("notify_telegram_chat_id"))
         self.notifications = NotificationService(self.notifier, self.settings)
         self.alerts.notifications = self.notifications
-        self.auth = AuthService(self.db, self.secrets, self.audit, cfg.session_ttl_hours)
+        self.auth = AuthService(self.db, self.audit, cfg.session_ttl_hours)
         self.tokens = ApiTokenService(self.db, self.audit)
-        self.users = PanelUserService(self.db, self.auth, self.audit)
+        self.users = PanelUserService(self.db)
+        self.spa = SpaService(self.db, self.secrets, self.settings, self.auth, self.audit,
+                              key=cfg.spa_connection_key, key_file=cfg.spa_connection_key_file,
+                              public_url=cfg.spa_public_url, lock=DistributedLock(dsn, SPA_LOCK_KEY))
         self.editor = ServerConfigEditor(self.vpn_gateway, DistributedLock(dsn, CONFIG_LOCK_KEY))
         self.server = ServerService(self.db, self.editor, self.audit)
         self.amnezia = AmneziaBackend(self.editor, self.vpn_gateway, ClientConfigBuilder(cfg.awg_container),
@@ -105,7 +110,6 @@ class Container:
         await self.live.start()
         async with self.startup_lock.hold():
             await self.db.create_schema()
-            await self.auth.ensure_initial_admin(self.cfg.initial_admin_user, self.cfg.initial_admin_password)
         await self.election.start()
 
     async def _become_leader(self) -> None:
@@ -146,6 +150,8 @@ class Container:
 
         self.scheduler = Scheduler()
         for job in (
+            # Users and roles from SPA, and the role catalogue to SPA (leader only).
+            PeriodicJob("spa", SYNC_SECONDS, self.spa.sync, initial_delay=5),
             PeriodicJob("traffic", poll_interval, self.collector.poll),
             PeriodicJob("sync", 300, self.clients.sync, initial_delay=300),
             PeriodicJob("policy", 60, self.policy.run, initial_delay=20),

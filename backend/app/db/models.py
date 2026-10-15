@@ -22,18 +22,21 @@ class TimestampMixin:
 
 
 class PanelUser(TimestampMixin, Base):
+    """A person who may use Network Control: a record synchronised from SPA (source "spa", external_id = the SPA user
+    ID). Sign-in, passwords, MFA and role assignment are in SPA; the record keeps the ID for ownership and the audit.
+    Records from before SPA (source "local") are bound to SPA once by username, or disabled by the first sync."""
     __tablename__ = "panel_users"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True)
     display_name: Mapped[str] = mapped_column(String(128), default="")
-    password_hash: Mapped[str] = mapped_column(String(256))
     role: Mapped[Role] = mapped_column(_enum(Role), default=Role.VIEWER)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
-    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
-    failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    locked_until: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    source: Mapped[str] = mapped_column(String(16), default="spa", server_default="local")
+    external_id: Mapped[str | None] = mapped_column(String(256))
+    email: Mapped[str] = mapped_column(String(256), default="", server_default="")
+    groups: Mapped[list[str]] = mapped_column(ARRAY(String(128)), default=list, server_default="{}")
+    synced_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class PanelSession(TimestampMixin, Base):
@@ -44,7 +47,6 @@ class PanelSession(TimestampMixin, Base):
     last_seen_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     ip: Mapped[str] = mapped_column(String(64), default="")
     user_agent: Mapped[str] = mapped_column(String(256), default="")
-    pending_2fa: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class VpnClient(TimestampMixin, Base):
@@ -146,6 +148,8 @@ class ApiToken(TimestampMixin, Base):
     prefix: Mapped[str] = mapped_column(String(16))
     role: Mapped[Role] = mapped_column(_enum(Role))
     created_by: Mapped[str] = mapped_column(String(64))
+    # The person the token belongs to: it works only while they are enabled in SPA, with at most their role.
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("panel_users.id", ondelete="CASCADE"), index=True)
     expires_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 

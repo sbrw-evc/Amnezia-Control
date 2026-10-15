@@ -33,8 +33,12 @@ class Settings(BaseSettings):
     clickhouse_db: str = "flows"
     flows_ttl_days: int = 30
 
-    initial_admin_user: str = "admin"
-    initial_admin_password: str = ""
+    # SPA (Single Point of Authorization): the connection key issued in SPA (spa1.…), or a file holding it; without
+    # either, the key is read from OpenBao (spa/connection_key). SPA_PUBLIC_URL: the address of Network Control when
+    # it differs from the address of the request (used for the redirect address).
+    spa_connection_key: str = ""
+    spa_connection_key_file: str = ""
+    spa_public_url: str = ""
 
     geoip_dir: str = "/data/geoip"
     data_dir: str = "/data"

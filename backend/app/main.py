@@ -43,7 +43,7 @@ async def value_error(_: Request, e: ValueError):
 async def validation_error(_: Request, e: RequestValidationError):
     first = e.errors()[0] if e.errors() else {}
     field = ".".join(str(x) for x in first.get("loc", [])[1:])
-    return JSONResponse({"detail": f"Некорректное поле {field}: {first.get('msg', '')}"}, status_code=422)
+    return JSONResponse({"detail": f"Invalid field {field}: {first.get('msg', '')}"}, status_code=422)
 
 
 @app.get("/api/health")
