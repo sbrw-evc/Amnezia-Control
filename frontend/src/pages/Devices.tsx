@@ -129,7 +129,7 @@ export default function Devices() {
                     <td><div className="text-sm text-slate-200">{d.facts.model || "—"}</div><div className="text-[11px] text-slate-500">{[d.facts.os, d.facts.version].filter(Boolean).join(" ")}</div></td>
                     <td className="mono">{d.host}<div className="text-[11px] text-slate-500">{d.transport}</div></td>
                     <td className="text-xs text-slate-400">
-                      {d.facts.cpu_percent != null && <div>CPU {d.facts.cpu_percent}%</div>}
+                      {d.facts.cpu_percent != null && <div>CPU {Math.round(d.facts.cpu_percent)}%</div>}
                       {d.facts.memory_percent != null && <div>RAM {d.facts.memory_percent}%</div>}
                       {d.facts.uptime_seconds != null && <div>up {uptime(d.facts.uptime_seconds)}</div>}
                     </td>
