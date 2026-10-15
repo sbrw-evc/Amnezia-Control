@@ -68,9 +68,14 @@ Sign-in and access are managed in **SPA — Single Point of Authorization** ([re
 1. In SPA: **Applications → Connect an application**, type `network-control`, the address of the panel
    (`PUBLIC_BASE_URL`). The redirect address is `<address>/api/auth/spa/callback`, the address after sign-out `<address>/`.
 2. Assign the roles `admin`, `operator`, `viewer` to people or groups. The first administrator of the panel is whoever
-   SPA gives the `admin` role.
+   SPA gives the `admin` role. **Give it to yourself before step 3:** the first synchronization disables every local
+   user SPA does not list, the old local `admin` included (a local user whose user name SPA also has is kept and bound
+   to that SPA account), and revokes their sessions and API tokens.
 3. Put the connection key into `SPA_CONNECTION_KEY` in `.env` (or a file named by `SPA_CONNECTION_KEY_FILE`, or the
    OpenBao secret `amnezia/spa/connection_key`, field `value` — re-read every minute) and run `docker compose up -d backend`.
+
+The first successful synchronization also deletes the TOTP secrets of the old sign-in (`users/<id>/totp` in OpenBao;
+audit log: `spa.legacy_totp_purged`).
 
 The users page and **Settings** show the connection: issuer, application, last synchronisation, counts, errors and
 **Synchronize now**.

@@ -12,6 +12,25 @@
 ![stack](https://img.shields.io/badge/db-PostgreSQL%2016-336791) ![stack](https://img.shields.io/badge/flows-ClickHouse-ffcc01)
 ![stack](https://img.shields.io/badge/secrets-OpenBao-5c4ee5) ![stack](https://img.shields.io/badge/VPN-AmneziaWG%203.x-orange)
 
+## Скриншоты
+
+Обзор с чек-листом **«Первые шаги»** — в светлой и тёмной теме:
+
+| Светлая | Тёмная |
+|---|---|
+| <img src="docs/screens/overview-light.png" alt="Обзор, светлая тема"> | <img src="docs/screens/overview-dark.png" alt="Обзор, тёмная тема"> |
+
+Остальные страницы показаны в теме вашего GitHub (обе версии — в [`docs/screens`](docs/screens)):
+
+| | |
+|---|---|
+| **Сетевые устройства**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/devices-dark.png"><img src="docs/screens/devices-light.png" alt="Сетевые устройства"></picture> | **Карта сети**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/network-map-dark.png"><img src="docs/screens/network-map-light.png" alt="Карта сети"></picture> |
+| **Анализ потоков**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/flows-dark.png"><img src="docs/screens/flows-light.png" alt="Анализ потоков"></picture> | **Клиенты VPN**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/vpn-clients-dark.png"><img src="docs/screens/vpn-clients-light.png" alt="Клиенты VPN"></picture> |
+| **Вход через SPA**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/sign-in-dark.png"><img src="docs/screens/sign-in-light.png" alt="Вход через SPA"></picture> | |
+
+Скриншоты сняты с настоящего приложения на демо-данных: `./scripts/screenshots.sh` (см. [Разработку](#разработка)). Интерфейс на
+скриншотах английский; русский включается в меню пользователя.
+
 ## Возможности
 
 - **Сетевые устройства** — MikroTik, TP-Link / Omada, UniFi, Keenetic, OpenWrt, OPNsense, pfSense, Cisco, HP / Aruba,
@@ -42,6 +61,10 @@
 - **Безопасность** — вход и доступ управляются в [SPA — единой точке авторизации](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-) (пароли, ключи доступа, MFA,
   каталоги — там), роли (администратор / оператор / наблюдатель) назначаются в SPA, сессии с отзывом,
   API-токены, журнал аудита, секреты только в OpenBao.
+- **Первые шаги и пошаговая настройка** — на обзоре чек-лист от установки до работающей панели (подключение SPA,
+  адрес приложения, первое устройство, приём потоков, VPN-клиент, уведомления в Telegram, резервные копии), а на
+  страницах устройств, анализа потоков, VPN-клиентов, маршрутизации и настроек — пошаговые руководства; каждый шаг
+  проверяется по реальным данным и отмечается сам, когда выполнен.
 - **Уведомления** — всплывающие уведомления (до 5 одновременно) для всех событий приложения и центр уведомлений с историей.
 - **Эксплуатация** — алерты (VPS, шлюз, туннель, OpenBao, квоты, сроки) с уведомлениями в Telegram,
   ежедневные резервные копии (PostgreSQL + снапшот OpenBao), несколько процессов API с выбором лидера.
@@ -100,6 +123,17 @@ nano .env                 # AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_
 роли и укажите ключ подключения `spa1.…` в `SPA_CONNECTION_KEY` в `.env` — см.
 [протокол](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-/blob/main/docs/protocol.md) и [Конфигурацию](https://github.com/sbrw-evc/Network-Control/wiki/ru-Configuration).
 
+> [!IMPORTANT]
+> **Назначьте себе роль «Администратор» в SPA до подключения.** Первая синхронизация отключает всех локальных
+> пользователей, которых нет в SPA, — в том числе старого локального `admin` — и отзывает их сессии и API-токены. Без
+> администратора из SPA открыть настройки потом будет некому. Существующий локальный пользователь сохраняется (вместе
+> с историей в журнале аудита), если в SPA есть человек с тем же именем пользователя; дальше он привязан к этой учётной
+> записи SPA.
+
+Переход со встроенного входа панели (до 2.0): пароли и TOTP 2FA убраны — MFA теперь в SPA. Старые TOTP-секреты в
+OpenBao (`users/<id>/totp`) удаляются при первой успешной синхронизации с SPA (в журнале аудита —
+`spa.legacy_totp_purged`); если OpenBao откажет, попытка повторится при следующей синхронизации.
+
 Панель: `http://<GATEWAY_IP>:8080` → **Войти через SPA**. Затем:
 
 1. Создайте в панели клиента для шлюза, сохраните его конфиг в `awg-client/config/awg0.conf`, перезапустите `awg-client`.
@@ -126,6 +160,17 @@ nano .env                 # AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_
 
 ```bash
 cd frontend && npm install && VITE_API_TARGET=http://<host>:8080 npm run dev
+```
+
+Демо-данные и скриншоты: `backend/demo/run.py` запускает настоящий backend на базе PostgreSQL, которую он очищает
+и заполняет демо-данными; SPA, ClickHouse, OpenBao, VPN-сервер, роутер и драйверы устройств заменены заглушками
+(встроенный OpenID Connect-провайдер, встраиваемый chdb, имитации с растущими счётчиками), а вход проходит по
+настоящему протоколу SPA от имени демо-администратора. `./scripts/screenshots.sh` собирает веб-приложение, запускает
+демо и снимает `docs/screens/*.png` через Playwright в обеих темах:
+
+```bash
+pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+DEMO_DATABASE_URL=postgresql+asyncpg://user:pass@127.0.0.1:5432/nc_demo ./scripts/screenshots.sh
 ```
 
 Структура, принципы и API — в [Wiki → Разработка](https://github.com/sbrw-evc/Network-Control/wiki/ru-Development).

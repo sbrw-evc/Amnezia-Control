@@ -12,6 +12,24 @@ and secret storage in OpenBao.
 ![stack](https://img.shields.io/badge/db-PostgreSQL%2016-336791) ![stack](https://img.shields.io/badge/flows-ClickHouse-ffcc01)
 ![stack](https://img.shields.io/badge/secrets-OpenBao-5c4ee5) ![stack](https://img.shields.io/badge/VPN-AmneziaWG%203.x-orange)
 
+## Screenshots
+
+The overview with the **First steps** checklist, in the light and the dark theme:
+
+| Light | Dark |
+|---|---|
+| <img src="docs/screens/overview-light.png" alt="Overview, light theme"> | <img src="docs/screens/overview-dark.png" alt="Overview, dark theme"> |
+
+The other pages follow the theme of your GitHub (both versions are in [`docs/screens`](docs/screens)):
+
+| | |
+|---|---|
+| **Network devices**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/devices-dark.png"><img src="docs/screens/devices-light.png" alt="Network devices"></picture> | **Network map**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/network-map-dark.png"><img src="docs/screens/network-map-light.png" alt="Network map"></picture> |
+| **Flow analysis**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/flows-dark.png"><img src="docs/screens/flows-light.png" alt="Flow analysis"></picture> | **VPN clients**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/vpn-clients-dark.png"><img src="docs/screens/vpn-clients-light.png" alt="VPN clients"></picture> |
+| **Sign-in through SPA**<br><picture><source media="(prefers-color-scheme: dark)" srcset="docs/screens/sign-in-dark.png"><img src="docs/screens/sign-in-light.png" alt="Sign-in through SPA"></picture> | |
+
+The screenshots are taken from the real application with demo data: `./scripts/screenshots.sh` (see [Development](#development)).
+
 ## Features
 
 - **Network devices** — MikroTik, TP-Link / Omada, UniFi, Keenetic, OpenWrt, OPNsense, pfSense, Cisco, HP / Aruba, Dell,
@@ -42,6 +60,10 @@ and secret storage in OpenBao.
 - **Security** — sign-in and access managed in [SPA — Single Point of Authorization](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-) (passwords, passkeys, MFA,
   directories live there), roles (administrator / operator / viewer) assigned in SPA, revocable sessions,
   API tokens, audit log, secrets kept only in OpenBao.
+- **First steps and setup guides** — the overview shows a checklist from installation to a working panel (SPA
+  connection, application address, first device, flow intake, VPN client, Telegram notifications, backups), and the
+  devices, flow analysis, VPN clients, routing and settings pages have step-by-step guides; every step is checked
+  against real data and ticks itself off when done.
 - **Notifications** — toast notifications (up to 5 at once) for every event in the app and a notification center with history.
 - **Operations** — alerts (VPS, gateway, tunnel, OpenBao, quotas, expiry) with Telegram notifications,
   daily backups (PostgreSQL + OpenBao snapshot), several API processes with leader election.
@@ -100,6 +122,16 @@ Network Control has no passwords of its own: people sign in through
 the roles, and put the connection key `spa1.…` into `SPA_CONNECTION_KEY` in `.env` — see the
 [protocol](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-/blob/main/docs/protocol.md) and [Configuration](https://github.com/sbrw-evc/Network-Control/wiki/Configuration).
 
+> [!IMPORTANT]
+> **Give yourself the Administrator role in SPA before you connect.** The first synchronization disables every local
+> user SPA does not list — including the old local `admin` — and revokes their sessions and API tokens. Without an
+> administrator from SPA nobody can open the settings afterwards. An existing local user is kept (with its audit
+> history) when SPA has a person with the same user name; from then on it is bound to that SPA account.
+
+Moving from the panel's own sign-in (before 2.0): passwords and TOTP 2FA are gone — SPA does MFA now. The old TOTP
+secrets in OpenBao (`users/<id>/totp`) are deleted at the first successful synchronization with SPA (recorded in the
+audit log as `spa.legacy_totp_purged`); if OpenBao refuses, it is tried again at the next synchronization.
+
 Panel: `http://<GATEWAY_IP>:8080` → **Sign in with SPA**. Then:
 
 1. Create a client for the gateway in the panel, save its config as `awg-client/config/awg0.conf`, restart `awg-client`.
@@ -126,6 +158,17 @@ The release page also has `network-control-X.Y.Z-deploy.tar.gz` — everything n
 
 ```bash
 cd frontend && npm install && VITE_API_TARGET=http://<host>:8080 npm run dev
+```
+
+Demo data and screenshots: `backend/demo/run.py` starts the real backend against a PostgreSQL database that it empties
+and fills with demo data; SPA, ClickHouse, OpenBao, the VPN server, the router and the device drivers are stand-ins
+(an in-process OpenID Connect issuer, the embedded chdb, fakes with growing counters), and sign-in goes through the
+real SPA flow as the demo administrator. `./scripts/screenshots.sh` builds the web app, starts the demo and takes
+`docs/screens/*.png` with Playwright in both themes:
+
+```bash
+pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+DEMO_DATABASE_URL=postgresql+asyncpg://user:pass@127.0.0.1:5432/nc_demo ./scripts/screenshots.sh
 ```
 
 Structure, principles and API — see [Wiki → Development](https://github.com/sbrw-evc/Network-Control/wiki/Development).
