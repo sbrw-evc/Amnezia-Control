@@ -12,6 +12,7 @@ import { Fmt } from "@/lib/format";
 import { useAction } from "@/lib/hooks";
 import type { FlowQuery, FlowResult, FlowWidgetRow } from "@/lib/types";
 import { Badge, Card, Kpi, Page, PageHeader, Segmented, StatusDot } from "@/components/ui/Primitives";
+import { SetupGuide } from "@/components/onboarding/Steps";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/Feedback";
 import { confirm } from "@/components/ui/Confirm";
 import Flag from "@/components/ui/Flag";
@@ -388,6 +389,7 @@ export default function Flows() {
           { value: "recent", label: t("Flows") }, { value: "exporters", label: t("Exporters") },
           { value: "rules", label: t("Rules") }, { value: "threats", label: t("Threats") },
         ]} />} />
+      <SetupGuide page="flows" />
       {tab === "overview" && <Overview />}
       {tab === "visualize" && <Visualize />}
       {tab === "recent" && <Recent />}

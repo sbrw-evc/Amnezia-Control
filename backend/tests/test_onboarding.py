@@ -99,7 +99,6 @@ def env():
 
 
 async def state(svc: OnboardingService, page: str | None = None, role: Role = Role.ADMIN) -> dict[str, bool]:
-    svc._cache = None
     r = await (svc.guide(page, role) if page else svc.checklist(role))
     return {s["id"]: s["done"] for s in r["steps"]} | {"_done": r["done"]}
 

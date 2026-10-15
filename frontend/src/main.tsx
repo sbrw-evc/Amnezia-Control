@@ -16,7 +16,13 @@ function reportQueryError(error: Error) {
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: reportQueryError }),
-  mutationCache: new MutationCache(),
+  // Any change made in the app can tick off a step of the checklist or of a page guide: read them again.
+  mutationCache: new MutationCache({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["onboarding"] });
+      queryClient.invalidateQueries({ queryKey: ["guide"] });
+    },
+  }),
   defaultOptions: { queries: { staleTime: 5_000, refetchInterval: 30_000, refetchOnWindowFocus: true, refetchOnReconnect: true, retry: 1 } },
 });
 

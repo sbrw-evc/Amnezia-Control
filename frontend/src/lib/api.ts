@@ -4,7 +4,7 @@ import type {
   MikrotikVpnInfo, ServerInfo, ServerKind, Session, Settings, SiteListSummary, Summary, TopRow, VpnClient, VpnServer,
   AuthConfig, SpaStatus,
   DeviceAction, DevicePlatform, DiscoveryResult, FlowExporter, FlowRule, FlowRuleKind, NetworkDevice, NetworkEndpoint,
-  SavedView, ThreatInfo, Topology,
+  SavedView, ThreatInfo, Topology, Onboarding,
 } from "./types";
 import { t, tServer } from "@/i18n";
 
@@ -197,6 +197,12 @@ export class DevicesApi extends Resource {
   savePositions(p: Record<string, [number, number] | null>) { return this.http.put("/api/topology/positions", p); }
 }
 
+/** Business processes: the "First steps" checklist of the overview and the setup guides of the pages. */
+export class OnboardingApi extends Resource {
+  checklist() { return this.http.get<Onboarding>("/api/onboarding"); }
+  guide(page: string) { return this.http.get<Onboarding>(`/api/guides/${encodeURIComponent(page)}`); }
+}
+
 export class ApiClient {
   readonly http = new HttpClient();
   readonly auth = new AuthApi(this.http);
@@ -207,6 +213,7 @@ export class ApiClient {
   readonly admin = new AdminApi(this.http);
   readonly flows = new FlowsApi(this.http);
   readonly devices = new DevicesApi(this.http);
+  readonly onboarding = new OnboardingApi(this.http);
 }
 
 export const api = new ApiClient();

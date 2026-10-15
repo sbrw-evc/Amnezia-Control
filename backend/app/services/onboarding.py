@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from dataclasses import asdict, dataclass, field
 from typing import Callable
 from urllib.parse import urlsplit
@@ -27,7 +26,6 @@ from .settings import SettingsService
 log = logging.getLogger(__name__)
 
 CHECK_SECONDS = 4.0
-CACHE_SECONDS = 3.0
 LOOPBACK = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 
 # The steps of the "First steps" checklist, in the order to do them.
@@ -166,7 +164,6 @@ class OnboardingService:
         self._backups = backups
         self._flows = flows
         self._public_urls = public_urls
-        self._cache: tuple[float, Facts] | None = None
 
     async def _check(self, name: str, probe) -> bool:
         """A check against another system (SPA's key source, OpenBao, ClickHouse, the disk): a failure or a timeout
@@ -177,9 +174,9 @@ class OnboardingService:
             log.debug("onboarding: %s not checked: %s", name, e)
             return False
 
-    async def facts(self, fresh: bool = False) -> Facts:
-        if not fresh and self._cache and time.monotonic() - self._cache[0] < CACHE_SECONDS:
-            return self._cache[1]
+    async def facts(self) -> Facts:
+        """Read on every request (a few counts and three probes, each bounded by CHECK_SECONDS), so a step is ticked
+        off as soon as it is done."""
         f = Facts()
         async with self._db.session() as s:
             async def n(model, *where) -> int:
@@ -225,7 +222,6 @@ class OnboardingService:
 
         f.telegram, f.backups, f.flows = await asyncio.gather(
             self._check("telegram", telegram), self._check("backups", backups), self._check("flows", flows))
-        self._cache = (time.monotonic(), f)
         return f
 
     async def checklist(self, role: Role) -> dict:

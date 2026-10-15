@@ -13,6 +13,7 @@ import { ROLE_LABEL, STATUS, uptime } from "@/lib/network";
 import type { DiscoveryResult } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { Badge, Card, Kpi, Modal, Page, PageHeader, Segmented, StatusDot } from "@/components/ui/Primitives";
+import { SetupGuide } from "@/components/onboarding/Steps";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/Feedback";
 import DeviceForm, { type DevicePrefill } from "@/components/devices/DeviceForm";
 
@@ -88,6 +89,7 @@ export default function Devices() {
           <button className="btn-ghost" onClick={() => setDiscover(true)}><Radar size={16} /> {t("Find on the network")}</button>
           <button className="btn-primary" onClick={() => setForm({ open: true })}><Plus size={16} /> {t("Add")}</button>
         </>} />
+      <SetupGuide page="devices" actions={{ create: () => setForm({ open: true }), discover: () => setDiscover(true) }} />
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Kpi label={t("Total devices")} value={total} icon={<Router size={16} />} />
         <Kpi label={t("Up")} value={up} icon={<StatusDot on pulse={false} />} tone="green" delay={0.05} hint={total - up ? t("unreachable: {n}", { n: total - up }) : t("all respond")} />

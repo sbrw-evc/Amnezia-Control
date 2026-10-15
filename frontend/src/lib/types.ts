@@ -338,3 +338,21 @@ export interface FlowRule {
 export interface ThreatContact { list: string; local: string; host: string; remote: string; country: string; asname: string; direction: string; bytes: number; flows: number; last_seen: string }
 export interface ThreatInfo { status: { lists: Record<string, number | string>; prefixes: number; updated_at: string } | null; enabled: boolean; lists: { name: string; url: string; enabled: boolean; terms?: string }[]; contacts: ThreatContact[] }
 export interface SavedView { id: number; name: string; state: Record<string, unknown>; shared: boolean; owner: string; mine: boolean }
+
+/** A step of the "First steps" checklist or of a page setup guide (GET /api/onboarding, /api/guides/{page}). */
+export interface OnboardingStep {
+  id: string;
+  done: boolean;
+  optional: boolean;
+  /** The page that fixes the step ("" — none). */
+  path: string;
+  /** In a page guide: the button of the page itself that does it ("" — none). */
+  action: string;
+  /** Whether the signed-in role may do it. */
+  can_fix: boolean;
+}
+
+export interface Onboarding {
+  done: boolean;
+  steps: OnboardingStep[];
+}

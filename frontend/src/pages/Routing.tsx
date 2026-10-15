@@ -8,6 +8,7 @@ import { useAction } from "@/lib/hooks";
 import { t } from "@/i18n";
 import { useAuth } from "@/store/auth";
 import { Badge, Card, Page, PageHeader, StatusDot } from "@/components/ui/Primitives";
+import { SetupGuide } from "@/components/onboarding/Steps";
 import { ErrorState, Skeleton } from "@/components/ui/Feedback";
 import { confirm } from "@/components/ui/Confirm";
 import { Donut } from "@/components/charts/Charts";
@@ -66,6 +67,7 @@ export default function Routing() {
           <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => onFile(e.target.files?.[0])} />
           <button className="btn-primary" onClick={() => fileRef.current?.click()} disabled={upload.isPending}><Upload size={16} /> {upload.isPending ? t("Applying…") : t("Upload ip-list.json")}</button>
         </>} />
+      <SetupGuide page="routing" actions={{ upload: () => fileRef.current?.click() }} />
 
       {q.error && <ErrorState error={q.error} />}
       <Card title={t("Traffic path")}>

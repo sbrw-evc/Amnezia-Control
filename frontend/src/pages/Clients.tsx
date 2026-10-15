@@ -13,6 +13,7 @@ import { useAction } from "@/lib/hooks";
 import { SERVER_LABEL, type ServerKind, type VpnClient } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { Badge, Modal, Page, PageHeader, StatusDot, UsageBar } from "@/components/ui/Primitives";
+import { SetupGuide } from "@/components/onboarding/Steps";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/Feedback";
 import { confirm } from "@/components/ui/Confirm";
 import { Checkbox } from "@/components/ui/Controls";
@@ -115,6 +116,7 @@ export default function Clients() {
           <button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> {t("New client")}</button>
           </>}
         </>} />
+      <SetupGuide page="clients" actions={{ create: () => setCreating(true) }} />
 
       <div className="card space-y-3 p-[18px]">
         <div className="relative">

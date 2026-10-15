@@ -31,7 +31,12 @@ export function ConnectInstructions({ error }: { error?: string | null }) {
           <code className="mono break-all text-slate-100">{origin}</code>
           <div className="mt-1 text-xs text-slate-500">{t("Redirect address:")} <code className="mono break-all">{origin}/api/auth/spa/callback</code></div>
         </li>
-        <li>{t("Give the roles Administrator, Operator or Viewer to people or groups.")}</li>
+        <li>
+          {t("Give the roles Administrator, Operator or Viewer to people or groups.")}
+          <div className="mt-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            {t("Give yourself the Administrator role before you connect: the first synchronization disables the old local admin and every user SPA does not list.")}
+          </div>
+        </li>
         <li>
           {t("Put the connection key (spa1.…) into SPA_CONNECTION_KEY in .env — or into the file named by SPA_CONNECTION_KEY_FILE, or the OpenBao secret spa/connection_key — and restart Network Control.")}
         </li>

@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bell, Save, Send, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAction } from "@/lib/hooks";
 import type { Settings } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { Badge, Card, Field, Page, PageHeader } from "@/components/ui/Primitives";
+import { SetupGuide } from "@/components/onboarding/Steps";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { Checkbox, NumberInput, Select } from "@/components/ui/Controls";
 import { Skeleton } from "@/components/ui/Feedback";
@@ -13,7 +15,7 @@ import SpaConnection from "@/components/admin/SpaConnection";
 import { k, t } from "@/i18n";
 
 type Def = { key: string; label: string; hint?: string; type: "text" | "number" | "bool" | "select"; options?: [string, string][] };
-const GROUPS: { title: string; fields: Def[] }[] = [
+const GROUPS: { title: string; anchor?: string; fields: Def[] }[] = [
   { title: k("Client configs"), fields: [
     { key: "client_dns", label: k("DNS for clients"), hint: k("comma-separated"), type: "text" },
     { key: "endpoint_host", label: k("Server address in configs"), hint: k("empty — AWG_HOST"), type: "text" },
@@ -31,7 +33,7 @@ const GROUPS: { title: string; fields: Def[] }[] = [
     { key: "gateway_stale_minutes", label: k("Alert when the gateway is silent longer than, min"), type: "number" },
     { key: "timezone", label: k("Time zone of reports"), type: "text" },
   ] },
-  { title: k("Notifications"), fields: [
+  { title: k("Notifications"), anchor: "notifications", fields: [
     { key: "notify_enabled", label: k("Send notifications"), type: "bool" },
     { key: "notify_min_severity", label: k("Minimum severity"), type: "select",
       options: [["info", k("Info")], ["warning", k("Warning")], ["critical", k("Critical")]] },
@@ -86,6 +88,12 @@ export default function SettingsPage() {
   const [form, setForm] = useState<Settings>({});
   useEffect(() => { if (q.data) setForm(q.data); }, [q.data]);
   const save = useAction((s: Settings) => api.ops.saveSettings(s), { success: t("Settings saved"), invalidate: [["settings"]] });
+  const spaSync = useAction(() => api.users.sync(), { success: t("Synchronization done"), invalidate: [["spa"], ["users"]] });
+  const { hash } = useLocation();
+  // Steps of the checklist and of the guide link to a card of this page (#spa, #notifications).
+  useEffect(() => {
+    if (q.data && hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [q.data, hash]);
 
   const set = (d: Def, v: string | boolean) =>
     setForm({ ...form, [d.key]: d.type === "number" ? (v === "" ? null : Number(v)) : v });
@@ -106,15 +114,18 @@ export default function SettingsPage() {
     <Page>
       <PageHeader title={t("Settings")} icon={<SettingsIcon size={20} />} subtitle={isAdmin ? t("Panel parameters and business rules") : t("View only")}
         actions={isAdmin && <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate(form)}><Save size={16} /> {t("Save")}</button>} />
+      <SetupGuide page="settings" actions={{ sync: () => spaSync.mutate(undefined) }} />
       {!q.data ? <Skeleton className="h-96" /> : (
         <div className="grid gap-4 xl:grid-cols-3">
           {GROUPS.map((g) => (
-            <Card key={g.title} title={t(g.title)}>
-              <div className="space-y-4">{g.fields.map((d) => <div key={d.key}>{input(d)}</div>)}</div>
-            </Card>
+            <div key={g.title} id={g.anchor} className="scroll-mt-20">
+              <Card title={t(g.title)}>
+                <div className="space-y-4">{g.fields.map((d) => <div key={d.key}>{input(d)}</div>)}</div>
+              </Card>
+            </div>
           ))}
           <TelegramCard isAdmin={isAdmin} />
-          {isAdmin && <div className="xl:col-span-2"><SpaConnection /></div>}
+          {isAdmin && <div id="spa" className="scroll-mt-20 xl:col-span-2"><SpaConnection /></div>}
         </div>
       )}
     </Page>

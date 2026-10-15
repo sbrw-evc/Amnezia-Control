@@ -10,6 +10,7 @@ import Flag from "@/components/ui/Flag";
 import { useLive } from "@/lib/live";
 import type { LivePoint } from "@/lib/types";
 import { Badge, Card, Kpi, Page, PageHeader, StatusDot } from "@/components/ui/Primitives";
+import { FirstSteps } from "@/components/onboarding/Steps";
 import { Skeleton } from "@/components/ui/Feedback";
 import { Donut, TopBars, TrafficChart } from "@/components/charts/Charts";
 import { chartColors, useTheme } from "@/lib/theme";
@@ -47,6 +48,7 @@ export default function Dashboard() {
   return (
     <Page>
       <PageHeader title={t("Overview")} icon={<LayoutDashboard size={20} />} subtitle={t("VPN, gateway and traffic status in real time")} />
+      <FirstSteps />
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {s ? (
