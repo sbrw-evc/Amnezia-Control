@@ -29,7 +29,7 @@ wait_for() {  # url, seconds
 
 (cd frontend && { [ -d node_modules ] || npm install --no-audit --no-fund; } && npm run build >"$LOGS/build.log")
 (cd backend && exec "$PYTHON" -m demo.run --port "$API_PORT" >"$LOGS/backend.log" 2>&1) & pids+=($!)
-(cd frontend && VITE_API_TARGET="http://127.0.0.1:${API_PORT}" exec npx vite preview --host 127.0.0.1 --port "$WEB_PORT" \
+(cd frontend && VITE_API_TARGET="http://127.0.0.1:${API_PORT}" exec ./node_modules/.bin/vite preview --host 127.0.0.1 --port "$WEB_PORT" \
   --strictPort >"$LOGS/web.log" 2>&1) & pids+=($!)
 wait_for "http://127.0.0.1:${API_PORT}/api/health" 120
 wait_for "${DEMO_PUBLIC_URL}/api/auth/config" 60

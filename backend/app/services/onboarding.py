@@ -142,7 +142,7 @@ GUIDES: dict[str, Callable[[Facts], list[Step]]] = {
     "settings": lambda f: [
         Step("spa", f.spa_connected and f.spa_synced and not f.spa_error and f.spa_admins > 0, action=ACTION_SYNC),
         Step("address", f.address),
-        Step("telegram", f.telegram),
+        Step("telegram", f.telegram, path="/settings#notifications"),
         Step("backups", f.backups, path="/backups"),
         Step("policy", f.default_policy, optional=True),
     ],

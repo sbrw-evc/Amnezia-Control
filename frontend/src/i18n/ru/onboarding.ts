@@ -96,6 +96,7 @@ export default {
   "Give yourself the Administrator role in SPA before connecting: the first synchronization disables the old local admin. Then check that the synchronization below runs without errors.": "Назначьте себе роль «Администратор» в SPA до подключения: первая синхронизация отключает старого локального admin. Затем проверьте, что синхронизация ниже проходит без ошибок.",
   "PUBLIC_BASE_URL (or SPA_PUBLIC_URL) in .env must be the address people open, not localhost; restart the backend after changing it.": "PUBLIC_BASE_URL (или SPA_PUBLIC_URL) в .env должен быть адресом, который открывают люди, а не localhost; после изменения перезапустите backend.",
   "Paste the bot token under Telegram bot, enter the chat id under Notifications, turn on Send notifications and save.": "Вставьте токен бота в «Telegram-бот», укажите chat id в «Уведомлениях», включите «Отправлять уведомления» и сохраните.",
+  "Show notifications": "Показать уведомления",
   "Leave Daily backup on and make the first backup.": "Оставьте «Ежедневную резервную копию» включённой и сделайте первую копию.",
   "A default quota and access period for new VPN clients, under Default policies.": "Квота и срок доступа по умолчанию для новых VPN-клиентов — в «Политиках по умолчанию».",
 };

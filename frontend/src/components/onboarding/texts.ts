@@ -92,7 +92,7 @@ export const GUIDES: Record<string, { intro: string; steps: Record<string, StepT
     steps: {
       spa: { title: k("Connect to SPA"), text: k("Give yourself the Administrator role in SPA before connecting: the first synchronization disables the old local admin. Then check that the synchronization below runs without errors."), go: k("Synchronize now") },
       address: { title: k("Set the application address"), text: k("PUBLIC_BASE_URL (or SPA_PUBLIC_URL) in .env must be the address people open, not localhost; restart the backend after changing it.") },
-      telegram: { title: k("Turn on Telegram notifications"), text: k("Paste the bot token under Telegram bot, enter the chat id under Notifications, turn on Send notifications and save.") },
+      telegram: { title: k("Turn on Telegram notifications"), text: k("Paste the bot token under Telegram bot, enter the chat id under Notifications, turn on Send notifications and save."), go: k("Show notifications") },
       backups: { title: k("Keep backups"), text: k("Leave Daily backup on and make the first backup."), go: k("Open backups") },
       policy: { title: k("Set default policies"), text: k("A default quota and access period for new VPN clients, under Default policies.") },
     },
