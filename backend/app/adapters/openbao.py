@@ -61,6 +61,14 @@ class OpenBaoSecretStore(SecretStore):
         if r.status_code not in (200, 204, 404):
             raise ExternalServiceError(f"OpenBao: deleting {path} returned {r.status_code}")
 
+    async def keys(self, prefix: str) -> list[str]:
+        r = await self._request("LIST", f"/v1/{self._mount}/metadata/{prefix.strip('/')}")
+        if r.status_code == 404:
+            return []
+        if r.status_code != 200:
+            raise ExternalServiceError(f"OpenBao: listing {prefix} returned {r.status_code}")
+        return [str(k) for k in (r.json().get("data") or {}).get("keys") or []]
+
     async def snapshot(self) -> bytes:
         r = await self._request("GET", "/v1/sys/storage/raft/snapshot", timeout=120)
         if r.status_code != 200:

@@ -3,6 +3,7 @@ checks), access_denied, user synchronisation (create, update, bind, disable, rol
 and sign-out. Tests that keep users need PostgreSQL (TEST_DATABASE_URL); the protocol checks run without it."""
 import asyncio
 import base64
+import contextlib
 import hashlib
 import os
 from types import SimpleNamespace
@@ -41,6 +42,9 @@ class Secrets:
 
     async def healthy(self):
         return True
+
+    async def keys(self, prefix):
+        return sorted({p[len(prefix):].split("/")[0] + "/" for p in self.d if p.startswith(prefix) and "/" in p[len(prefix):]})
 
 
 class MemSettings:
@@ -404,5 +408,62 @@ def test_first_sign_in_binds_legacy_user_once(env):
             assert r.status_code == 403
         async with e.db.session() as s:
             assert (await UserRepo(s).get(old_id)).username == "admin"
+
+    asyncio.run(scenario())
+
+
+@needs_db
+def test_first_sync_deletes_old_totp_secrets(env):
+    from app.db.models import PanelUser
+    from app.db.repositories import UserRepo
+
+    async def scenario():
+        e = await env()
+        async with e.db.session() as s:
+            old = UserRepo(s).add(PanelUser(username="admin", role=Role.ADMIN, source="local"))
+            await s.flush()
+            old_id = old.id
+        secrets = e.spa._secrets
+        # A user of the database, one deleted before the move (only in OpenBao) and a secret that is not TOTP.
+        secrets.d.update({f"users/{old_id}/totp": {"secret": "A"}, "users/999/totp": {"secret": "B"},
+                          "notify/telegram": {"token": "t"}, "spa/state_key": {"k": "x"}})
+        e.fake.add_user("usr_x", "admin", ["admin"])
+        await e.spa.sync()
+        assert not [p for p in secrets.d if p.endswith("/totp")]
+        assert "notify/telegram" in secrets.d
+        assert (await e.spa.state())["legacy_totp_purged_at"]
+        assert "spa.legacy_totp_purged" in await audit_actions(e.db)
+        # Once: later synchronisations do not touch OpenBao again.
+        secrets.d["users/5/totp"] = {"secret": "C"}
+        await e.spa.sync(force=True)
+        assert "users/5/totp" in secrets.d
+
+    asyncio.run(scenario())
+
+
+def test_totp_cleanup_failure_does_not_break_sync():
+    class Broken(Secrets):
+        async def keys(self, prefix):
+            raise ExternalServiceError("OpenBao is unreachable")
+
+    async def scenario():
+        svc = make(FakeSpa(), secrets=Broken())
+
+        class Users:
+            async def all(self):
+                return []
+
+        @contextlib.asynccontextmanager
+        async def session():
+            yield None
+
+        svc._db = SimpleNamespace(session=session)
+        orig = spa_mod.UserRepo
+        spa_mod.UserRepo = lambda s: Users()
+        try:
+            assert await svc.purge_legacy_totp() is None
+            assert "legacy_totp_purged_at" not in await svc.state()
+        finally:
+            spa_mod.UserRepo = orig
 
     asyncio.run(scenario())

@@ -51,6 +51,8 @@ SYNC_SECONDS = 300
 KEY_RELOAD_SECONDS = 60
 SCOPES = ["openid", "profile", "email", "groups", "roles"]
 SPA_ACTOR = Actor("spa", "system")
+# Before SPA, the TOTP secrets of local users were kept in OpenBao at users/<id>/totp.
+LEGACY_TOTP = "users/{}/totp"
 
 # The fixed role catalogue of Network Control, published to SPA; SPA administrators assign these roles.
 ROLE_CATALOGUE = [
@@ -427,6 +429,7 @@ class SpaService:
                     config=cfg if isinstance(cfg, dict) else {}, etag=etag, error=None,
                     last_attempt_at=started.isoformat(), last_sync_at=started.isoformat(), counts=counts,
                     last_result={k: v for k, v in summary.items()})
+                await self.purge_legacy_totp()
                 if actor is not None or summary["created"] or summary["updated"] or summary["disabled"]:
                     async with self._db.session() as s:
                         self._audit.record(s, actor or SPA_ACTOR, "spa.sync", "spa", "", conn.issuer,
@@ -436,6 +439,29 @@ class SpaService:
                 await self._save_state(connected=True, issuer=conn.issuer, client_id=conn.client_id,
                                        key_source=conn.source, error=e.message, last_attempt_at=started.isoformat())
                 raise
+
+    async def purge_legacy_totp(self) -> int | None:
+        """Deletes the TOTP secrets of the sign-in from before SPA (OpenBao users/<id>/totp): MFA is SPA's now. Runs once,
+        at the first successful synchronisation, for every user the database knows and every folder OpenBao lists under
+        users/ (users deleted before the move included). Returns the number of users checked; None when it was done
+        before or OpenBao failed (then it is tried again at the next synchronisation)."""
+        if (await self.state()).get("legacy_totp_purged_at"):
+            return None
+        async with self._db.session() as s:
+            ids = {str(u.id) for u in await UserRepo(s).all()}
+        try:
+            listed = await self._secrets.keys("users/") if hasattr(self._secrets, "keys") else []
+            ids |= {k.rstrip("/") for k in listed if k.endswith("/") and k.rstrip("/")}
+            for user_id in sorted(ids):
+                await self._secrets.delete(LEGACY_TOTP.format(user_id))
+        except Exception as e:  # OpenBao down or the policy lacks list/delete: the synchronisation itself goes on
+            log.warning("SPA: old TOTP secrets are not deleted yet: %s", e)
+            return None
+        await self._save_state(legacy_totp_purged_at=utcnow().isoformat())
+        async with self._db.session() as s:
+            self._audit.record(s, SPA_ACTOR, "spa.legacy_totp_purged", "spa", "", "users/*/totp", users=len(ids))
+        log.info("SPA: old TOTP secrets deleted for %d users", len(ids))
+        return len(ids)
 
     async def _apply_all(self, people: list[Identity]) -> dict:
         now = utcnow()
