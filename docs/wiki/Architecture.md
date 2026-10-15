@@ -40,7 +40,7 @@ The API runs in several processes (`WEB_CONCURRENCY`). They coordinate through P
 - **Distributed lock** — all changes to `awg0.conf` are serialized across processes.
 - **LiveState** — a per-process cache of live metrics, fed from the bus.
 
-CPU-heavy work (argon2, QR codes, site list parsing, database decompression) runs in a thread pool.
+CPU-heavy work (QR codes, site list parsing, database decompression) runs in a thread pool.
 
 ### Background jobs (leader)
 

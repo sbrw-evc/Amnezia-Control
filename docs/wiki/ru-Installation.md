@@ -68,8 +68,7 @@ curl -L https://github.com/sbrw-evc/Network-Control/releases/download/v1.0.0/net
 
 После запуска:
 
-1. Откройте `PUBLIC_BASE_URL`, войдите как `admin` с паролем `INITIAL_ADMIN_PASSWORD` и задайте свой пароль.
-   После этого работает только новый пароль.
+1. Подключите панель к SPA (см. [[Конфигурация|ru-Configuration]] → Подключение к SPA), откройте `PUBLIC_BASE_URL` и войдите через SPA.
 2. **Клиенты VPN → Новый клиент** — создайте клиента для шлюза (например, `home-gateway`), скачайте `.conf`
    и сохраните как `awg-client/config/awg0.conf`. Выполните `docker compose restart awg-client`.
 3. Импортируйте конфигурацию MikroTik — [[Настройка MikroTik|ru-MikroTik]].

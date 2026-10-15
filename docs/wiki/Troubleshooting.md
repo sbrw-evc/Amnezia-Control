@@ -41,9 +41,10 @@ and that `awg-client` is running. While the tunnel is down, traffic uses the fal
 
 ## Signing in
 
-- "Invalid login or password" — check the keyboard layout (the eye button reveals the typed password); after 5 failures the account is locked for 10 minutes.
-- `INITIAL_ADMIN_PASSWORD` from `.env` is valid only until the first sign-in: the panel immediately asks you to set your own password, and only that password works afterwards.
-- Forgotten password — `docker compose exec backend python -m app.cli reset-password admin`.
+- "This application is not connected to SPA" — set `SPA_CONNECTION_KEY` (see [[Configuration]]); a damaged key is reported on the same page.
+- "You have no role in Network Control" — an SPA administrator has to give you `admin`, `operator` or `viewer`.
+- Passwords, passkeys and MFA are managed in SPA (user menu → Account and security).
+- "SPA rejected the connection key" in Settings — the key was reissued in SPA: put the new one into `.env`.
 - Old UI after an update — `Ctrl+F5` (HTML is not cached, assets are versioned).
 
 ## OpenBao

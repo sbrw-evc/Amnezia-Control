@@ -22,7 +22,7 @@ self-hosted AmneziaWG VPN and selective routing (sites from a list go through th
 | [[Network-Map]] | The live network map |
 | [[Flows]] | Flow analytics: exporters, dimensions, filter language, aggregates, detection rules, threats |
 | [[Routing]] | Site list, custom prefixes, route check |
-| [[Security]] | Roles, 2FA, sessions, API tokens, OpenBao, audit |
+| [[Security]] | Sign-in through SPA, roles, sessions, API tokens, OpenBao, audit |
 | [[Backups]] | Backup and restore |
 | [[API]] | REST API, token authentication, SSE |
 | [[Troubleshooting]] | Diagnostics and common issues |
@@ -47,4 +47,4 @@ self-hosted AmneziaWG VPN and selective routing (sites from a list go through th
 - Flow analytics in the style of Akvorado / Umbrella Flow: exporters and interfaces, applications, aggregates,
   DDoS / scan / anomaly rules, threat intelligence, reverse DNS, saved views.
 - Toast notifications and a notification center, alerts and Telegram notifications, audit log, backups.
-- RBAC, 2FA, API tokens, secrets in OpenBao.
+- Sign-in and access managed in SPA (Single Point of Authorization), RBAC, API tokens, secrets in OpenBao.

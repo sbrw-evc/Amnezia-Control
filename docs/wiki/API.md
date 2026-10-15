@@ -4,8 +4,10 @@ Interactive OpenAPI documentation: `/api/docs` (schema — `/api/openapi.json`).
 
 ## Authentication
 
-- **Browser** — session cookie + the `X-Requested-With: network-control` header for state-changing requests.
-- **Integrations** — an API token: `Authorization: Bearer ac_…` (the role is set when the token is issued).
+- **Browser** — sign-in through SPA (`GET /api/auth/spa/start?return=…` → SPA → `GET /api/auth/spa/callback`), then the
+  session cookie + the `X-Requested-With: network-control` header for state-changing requests.
+- **Integrations** — an API token: `Authorization: Bearer ac_…` (the role is set when the token is issued; at most the
+  role of its owner, and it stops working when SPA disables the owner).
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" http://<panel>/api/analytics/summary
@@ -32,6 +34,9 @@ curl -H "Authorization: Bearer $TOKEN" http://<panel>/api/analytics/summary
 | GET/PUT | `/api/server/config` | administrator | AWG server config |
 | GET/POST/DELETE | `/api/backups` | administrator | Backups |
 | GET/POST/DELETE | `/api/tokens` | administrator | API tokens |
+| GET | `/api/users` | administrator | Users (read-only, synchronised from SPA) |
+| GET · POST | `/api/spa` · `/api/spa/sync` | administrator | SPA connection status; Synchronize now |
+| GET · POST | `/api/auth/config` · `/api/auth/logout` | — / session | SPA connection for the sign-in page; sign-out (returns SPA's sign-out address) |
 | GET/PUT | `/api/settings` | viewer / administrator | Settings |
 | GET | `/api/alerts` · `/api/audit` | viewer / administrator | Alerts, audit |
 | GET | `/api/events` | viewer | Server-Sent Events |

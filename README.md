@@ -39,7 +39,8 @@ and secret storage in OpenBao.
 - **Routing** — tunnel status on MikroTik, site list upload (`ip-list.json`), custom domains and prefixes,
   "where will this traffic go" check, automatic fallback to the ISP when the tunnel is down.
 - **AWG server** — obfuscation parameters, an `awg0.conf` editor with backups that applies changes without dropping connections.
-- **Security** — roles (administrator / operator / viewer), argon2, 2FA (TOTP), revocable sessions,
+- **Security** — sign-in and access managed in [SPA — Single Point of Authorization](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-) (passwords, passkeys, MFA,
+  directories live there), roles (administrator / operator / viewer) assigned in SPA, revocable sessions,
   API tokens, audit log, secrets kept only in OpenBao.
 - **Notifications** — toast notifications (up to 5 at once) for every event in the app and a notification center with history.
 - **Operations** — alerts (VPS, gateway, tunnel, OpenBao, quotas, expiry) with Telegram notifications,
@@ -59,9 +60,9 @@ and secret storage in OpenBao.
 |---|---|
 | `awg-client` | The gateway's AmneziaWG client: policy routing LAN → `awg0`, NAT, MSS clamp |
 | `backend` | REST API, SSE, device drivers, background jobs (VPN and device polling, policies, detection rules, health checks, backups) |
-| `frontend` | SPA + API proxy + OpenStreetMap tile proxy |
+| `frontend` | Web UI (React) + API proxy + OpenStreetMap tile proxy |
 | `postgres` | Clients, statistics, audit, alerts, users |
-| `openbao` / `bao-init` | Secrets (client keys, SSH key, TOTP, Telegram token), auto-unseal |
+| `openbao` / `bao-init` | Secrets (client keys, SSH key, Telegram token, optionally the SPA connection key), auto-unseal |
 | `clickhouse` | Network flows and aggregates; site, threat, exporter, interface and host dictionaries |
 | `flow-collector` | goflow2 (NetFlow / IPFIX UDP 2055, sFlow UDP 6343) + enrichment (country, ASN, direction, route, exporter) |
 
@@ -86,12 +87,20 @@ Requirements: Docker 24+ with Compose v2, SSH key access to the Amnezia VPS and 
 git clone https://github.com/sbrw-evc/Network-Control.git /opt/network-control
 cd /opt/network-control
 ./install.sh              # creates .env with random passwords
-nano .env                 # AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_BASE_URL
+nano .env                 # AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_BASE_URL, SPA_CONNECTION_KEY
 ./install.sh              # starts the stack
 ```
 
-Panel: `http://<GATEWAY_IP>:8080`, login `admin`, password — `INITIAL_ADMIN_PASSWORD` from `.env`
-(you will be asked to change it on first login). Then:
+### Sign-in and access are managed in SPA
+
+Network Control has no passwords of its own: people sign in through
+[SPA — Single Point of Authorization](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-) (OpenID Connect), which also decides their roles here
+(`admin`, `operator`, `viewer`) and synchronises the users every 5 minutes. To connect, in SPA open
+**Applications → Connect an application**, type `network-control`, address `PUBLIC_BASE_URL`, give people or groups
+the roles, and put the connection key `spa1.…` into `SPA_CONNECTION_KEY` in `.env` — see the
+[protocol](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-/blob/main/docs/protocol.md) and [Configuration](https://github.com/sbrw-evc/Network-Control/wiki/Configuration).
+
+Panel: `http://<GATEWAY_IP>:8080` → **Sign in with SPA**. Then:
 
 1. Create a client for the gateway in the panel, save its config as `awg-client/config/awg0.conf`, restart `awg-client`.
 2. Import `mikrotik/network-control.rsc` on MikroTik (addresses are at the top of the file).

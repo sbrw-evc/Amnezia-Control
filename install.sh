@@ -6,11 +6,10 @@ secret() { head -c 32 /dev/urandom | base64 | tr -d '/+=' | cut -c1-28; }
 
 if [ ! -f .env ]; then
   cp .env.example .env
-  sed -i "s/^INITIAL_ADMIN_PASSWORD=.*/INITIAL_ADMIN_PASSWORD=$(secret)/" .env
   sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(secret)/" .env
   sed -i "s/^CLICKHOUSE_PASSWORD=.*/CLICKHOUSE_PASSWORD=$(secret)/" .env
   chmod 600 .env
-  echo "Created .env — set AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_BASE_URL and run install.sh again."
+  echo "Created .env — set AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_BASE_URL, SPA_CONNECTION_KEY and run install.sh again."
   exit 0
 fi
 
@@ -37,5 +36,5 @@ docker compose pull --ignore-pull-failures --quiet || true
 docker compose up -d
 echo
 echo "Network Control is running: $(sed -n 's/^PUBLIC_BASE_URL=//p' .env)"
-echo "Login: $(sed -n 's/^INITIAL_ADMIN_USER=//p' .env), password: INITIAL_ADMIN_PASSWORD from .env (you will be asked to change it)"
+grep -q "^SPA_CONNECTION_KEY=spa1\." .env || echo "Sign-in is through SPA: set SPA_CONNECTION_KEY in .env (see the README) and run docker compose up -d backend."
 echo "Back up openbao/keys/unseal.key and data/bao-init/init.json to a safe place."

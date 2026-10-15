@@ -1,29 +1,45 @@
 # Security
 
+## Sign-in and access are managed in SPA
+
+Network Control keeps no passwords, password policy, passkeys or directory settings. People sign in through
+**SPA — Single Point of Authorization** ([repository](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-), [protocol](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-/blob/main/docs/protocol.md)): passwords, passkeys, MFA,
+LDAP / Active Directory, Entra ID and other providers live there, and SPA administrators decide who gets which role in
+Network Control.
+
+- Sign-in: OpenID Connect authorization code flow with PKCE (S256), nonce and a signed single-use state; the verifier
+  is kept in an HttpOnly `SameSite=Lax` cookie on `/api/auth/spa/` for 10 minutes. The ID token is verified with SPA's
+  JWKS (RS256, `iss`, `aud`, `exp`, `nonce`). After the callback Network Control starts its own session.
+- Users are records synchronised from SPA every 5 minutes (on the leader) and on **Synchronize now**: created, updated
+  (name, e-mail, groups, role) and disabled. A person SPA disables or no longer lists loses all sessions and API tokens
+  at once. Records from before SPA are bound to SPA once by username at the first sync or sign-in (then by SPA ID
+  only); the old local accounts SPA does not list are disabled by the first sync.
+- Sign-out ends the local session and SPA's session. "Account and security" in the user menu opens the SPA account page.
+- How to connect: see [[Configuration]] (`SPA_CONNECTION_KEY`).
+
 ## Roles
 
-| Role | Permissions |
+The catalogue is fixed and published to SPA at start (`PUT /api/spa/v1/roles`):
+
+| Role (ID) | Permissions |
 |---|---|
-| Administrator | Everything: server, routing, operators, tokens, audit, backups, settings |
-| Operator | VPN clients: create, edit, block, hand out configs, reissue, delete |
-| Viewer | Read-only access to monitoring, analytics and flows |
+| Administrator (`admin`) | Everything: server, routing, devices, API tokens, audit, backups, settings |
+| Operator (`operator`) | VPN clients: create, edit, block, hand out configs, reissue, delete; devices and alerts |
+| Viewer (`viewer`) | Read-only access to monitoring, analytics and flows |
 
-Lockout protection: the last administrator cannot be deleted or demoted, and users cannot change their own role or disable themselves.
+When SPA gives several roles, the strongest one applies. People without a role cannot sign in.
 
-## Authentication
+## Sessions
 
-- Passwords are hashed with argon2id; at least 10 characters and two character classes.
-- An account is locked for 10 minutes after 5 failed attempts; sign-in attempts are rate-limited per IP.
-- Sessions are random tokens in an httpOnly `SameSite=Strict` cookie; only the SHA-256 is stored in the database. Sessions can be listed and revoked in the profile.
-- Changing the password ends all other sessions. New operators and reset passwords must be changed at sign-in.
-- 2FA (TOTP) — the secret is stored in OpenBao; an administrator can disable 2FA for a user.
+- Sessions are random tokens in an httpOnly `SameSite=Strict` cookie; only the SHA-256 is stored in the database
+  (12 h by default, `SESSION_TTL_HOURS`). Sessions can be listed and revoked in the profile.
 - CSRF — state-changing requests require the `X-Requested-With: network-control` header.
-- Password fields have a show/hide button.
 
 ## API tokens
 
-Issued by administrators ("Panel access" page) with a role and an expiry. Format `ac_…`, shown once,
-only the hash is stored. Used as `Authorization: Bearer ac_…`; they do not grant access to the profile or sessions.
+Issued by administrators ("Users and access" page) with a role and an expiry. Format `ac_…`, shown once, only the hash
+is stored. Used as `Authorization: Bearer ac_…`; they do not grant access to the profile or sessions. A token belongs
+to the person who issued it: it never has more rights than their current role and is revoked when SPA disables them.
 
 ## Secrets
 
@@ -31,9 +47,9 @@ only the hash is stored. Used as `Authorization: Bearer ac_…`; they do not gra
 |---|---|
 | Client private keys | OpenBao `amnezia/clients/<id>` |
 | SSH key for the VPS and MikroTik | OpenBao `amnezia/infra/ssh` (the backend writes it only to a temporary tmpfs) |
-| TOTP secrets | OpenBao `amnezia/users/<id>/totp` |
+| SPA connection key (optional) | OpenBao `amnezia/spa/connection_key` (`value`), or `SPA_CONNECTION_KEY` in `.env` |
 | Telegram bot token | OpenBao `amnezia/notify/telegram` |
-| Database, ClickHouse and first administrator passwords | `.env` (mode 600) |
+| Database and ClickHouse passwords | `.env` (mode 600) |
 
 The backend authenticates to OpenBao with an AppRole whose policy is limited to `amnezia/*` and reading the raft snapshot.
 OpenBao, PostgreSQL and ClickHouse do not publish any ports.
@@ -43,12 +59,12 @@ unattended operation, but the key lives on the same host: protect the host and k
 
 ## Audit
 
-The log records sign-ins and failed attempts, every client operation (including each config disclosure and share-link open),
-changes to the server config, site list, custom prefixes, settings, operators, tokens, and backups.
+The log records sign-ins and sign-outs, SPA synchronisations (users created, bound, updated, disabled), every client operation (including each config disclosure and share-link open),
+changes to the server config, site list, custom prefixes, settings, tokens, and backups.
 Filters by action type and search; entries appear in real time.
 
 ## Recommendations
 
 - Expose the panel only on the LAN or through a VPN; for external access use a reverse proxy with HTTPS and `COOKIE_SECURE=true`.
-- Enable 2FA for administrators.
+- Require MFA or passkeys for administrators in SPA.
 - Use dedicated SSH keys and a restricted user on MikroTik.

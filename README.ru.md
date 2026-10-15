@@ -39,7 +39,8 @@
 - **Маршрутизация** — статус туннеля на MikroTik, загрузка списка сайтов (`ip-list.json`), свои домены и подсети,
   проверка «куда пойдёт трафик», автоматический переход на провайдера при падении туннеля.
 - **Сервер AWG** — параметры обфускации, редактор `awg0.conf` с резервными копиями и применением без разрыва соединений.
-- **Безопасность** — роли (администратор / оператор / наблюдатель), argon2, 2FA (TOTP), сессии с отзывом,
+- **Безопасность** — вход и доступ управляются в [SPA — единой точке авторизации](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-) (пароли, ключи доступа, MFA,
+  каталоги — там), роли (администратор / оператор / наблюдатель) назначаются в SPA, сессии с отзывом,
   API-токены, журнал аудита, секреты только в OpenBao.
 - **Уведомления** — всплывающие уведомления (до 5 одновременно) для всех событий приложения и центр уведомлений с историей.
 - **Эксплуатация** — алерты (VPS, шлюз, туннель, OpenBao, квоты, сроки) с уведомлениями в Telegram,
@@ -59,9 +60,9 @@
 |---|---|
 | `awg-client` | AmneziaWG-клиент шлюза: policy routing LAN → `awg0`, NAT, MSS clamp |
 | `backend` | REST API, SSE, драйверы устройств, фоновые задачи (опрос VPN и устройств, политики, правила, здоровье, бэкапы) |
-| `frontend` | SPA + прокси API и тайлов OpenStreetMap |
+| `frontend` | веб-интерфейс (React) + прокси API и тайлов OpenStreetMap |
 | `postgres` | клиенты, статистика, аудит, алерты, пользователи |
-| `openbao` / `bao-init` | секреты (ключи клиентов, SSH-ключ, TOTP, токен Telegram), auto-unseal |
+| `openbao` / `bao-init` | секреты (ключи клиентов, SSH-ключ, токен Telegram, при желании ключ подключения к SPA), auto-unseal |
 | `clickhouse` | сетевые потоки и агрегаты; словари сайтов, угроз, экспортёров, интерфейсов и хостов |
 | `flow-collector` | goflow2 (NetFlow / IPFIX UDP 2055, sFlow UDP 6343) + обогащение (страна, ASN, направление, маршрут, экспортёр) |
 
@@ -86,12 +87,20 @@
 git clone https://github.com/sbrw-evc/Network-Control.git /opt/network-control
 cd /opt/network-control
 ./install.sh              # создаст .env с паролями
-nano .env                 # AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_BASE_URL
+nano .env                 # AWG_HOST, ROUTER_HOST, GATEWAY_IP, LAN_CIDR, PUBLIC_BASE_URL, SPA_CONNECTION_KEY
 ./install.sh              # поднимет стек
 ```
 
-Панель: `http://<GATEWAY_IP>:8080`, логин `admin`, пароль — `INITIAL_ADMIN_PASSWORD` из `.env`
-(при первом входе потребуется сменить). Затем:
+### Вход и доступ управляются в SPA
+
+У Network Control нет собственных паролей: вход — через
+[SPA — единую точку авторизации](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-) (OpenID Connect), которая также назначает роли
+(`admin`, `operator`, `viewer`) и синхронизирует пользователей каждые 5 минут. Чтобы подключить, в SPA откройте
+**Приложения → Подключить приложение**, тип `network-control`, адрес `PUBLIC_BASE_URL`, назначьте людям или группам
+роли и укажите ключ подключения `spa1.…` в `SPA_CONNECTION_KEY` в `.env` — см.
+[протокол](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-/blob/main/docs/protocol.md) и [Конфигурацию](https://github.com/sbrw-evc/Network-Control/wiki/ru-Configuration).
+
+Панель: `http://<GATEWAY_IP>:8080` → **Войти через SPA**. Затем:
 
 1. Создайте в панели клиента для шлюза, сохраните его конфиг в `awg-client/config/awg0.conf`, перезапустите `awg-client`.
 2. Импортируйте на MikroTik `mikrotik/network-control.rsc` (адреса в начале файла).

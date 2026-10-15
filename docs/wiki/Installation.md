@@ -68,8 +68,7 @@ it creates the data directories and the OpenBao unseal key, sets permissions and
 
 After the start:
 
-1. Open `PUBLIC_BASE_URL`, sign in as `admin` with the `INITIAL_ADMIN_PASSWORD` and set your own password.
-   From then on only the new password works.
+1. Connect the panel to SPA (see [[Configuration]] → Connecting to SPA), open `PUBLIC_BASE_URL` and sign in with SPA.
 2. **VPN clients → New client** — create a client for the gateway (e.g. `home-gateway`), download the `.conf`
    and save it as `awg-client/config/awg0.conf`. Run `docker compose restart awg-client`.
 3. Import the MikroTik configuration — see [[MikroTik]].

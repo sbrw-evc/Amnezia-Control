@@ -4,8 +4,10 @@
 
 ## Авторизация
 
-- **Браузер** — cookie сессии + заголовок `X-Requested-With: network-control` для изменяющих запросов.
-- **Интеграции** — API-токен: `Authorization: Bearer ac_…` (роль задаётся при выпуске).
+- **Браузер** — вход через SPA (`GET /api/auth/spa/start?return=…` → SPA → `GET /api/auth/spa/callback`), затем
+  cookie сессии + заголовок `X-Requested-With: network-control` для изменяющих запросов.
+- **Интеграции** — API-токен: `Authorization: Bearer ac_…` (роль задаётся при выпуске; не выше роли владельца,
+  токен перестаёт работать, когда SPA отключает владельца).
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" http://<panel>/api/analytics/summary
@@ -32,6 +34,9 @@ curl -H "Authorization: Bearer $TOKEN" http://<panel>/api/analytics/summary
 | GET/PUT | `/api/server/config` | администратор | Конфиг сервера AWG |
 | GET/POST/DELETE | `/api/backups` | администратор | Резервные копии |
 | GET/POST/DELETE | `/api/tokens` | администратор | API-токены |
+| GET | `/api/users` | администратор | Пользователи (только чтение, синхронизируются из SPA) |
+| GET · POST | `/api/spa` · `/api/spa/sync` | администратор | Состояние подключения к SPA; синхронизировать сейчас |
+| GET · POST | `/api/auth/config` · `/api/auth/logout` | — / сессия | Подключение к SPA для страницы входа; выход (возвращает адрес выхода в SPA) |
 | GET/PUT | `/api/settings` | наблюдатель / администратор | Настройки |
 | GET | `/api/alerts` · `/api/audit` | наблюдатель / администратор | Алерты, аудит |
 | GET | `/api/events` | наблюдатель | Server-Sent Events |

@@ -25,7 +25,9 @@
 | `PANEL_PORT` | `8080` | Panel port |
 | `FLOW_PORT` | `2055` | UDP port for NetFlow |
 | `SFLOW_PORT` | `6343` | UDP port for sFlow |
-| `INITIAL_ADMIN_USER` / `INITIAL_ADMIN_PASSWORD` | `admin` / — | First administrator (created when there are no users); the password is valid only until the first login |
+| `SPA_CONNECTION_KEY` | — | Connection key `spa1.…` issued by SPA (see below) |
+| `SPA_CONNECTION_KEY_FILE` | — | A file holding the connection key, instead of the variable |
+| `SPA_PUBLIC_URL` | — | Address of the panel when it differs from the request address (for the redirect address) |
 | `POSTGRES_PASSWORD` | — | PostgreSQL password |
 | `CLICKHOUSE_PASSWORD` | — | ClickHouse password |
 | `OPENBAO_VERSION` | `2.6.2` | OpenBao image version |
@@ -57,3 +59,18 @@
 | | Reverse DNS (PTR) of remote hosts | On by default |
 
 Settings are stored in PostgreSQL and picked up by all processes within 15 seconds.
+
+## Connecting to SPA
+
+Sign-in and access are managed in **SPA — Single Point of Authorization** ([repository](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-),
+[protocol](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-/blob/main/docs/protocol.md)). Without a connection the panel shows "This application is not connected to SPA".
+
+1. In SPA: **Applications → Connect an application**, type `network-control`, the address of the panel
+   (`PUBLIC_BASE_URL`). The redirect address is `<address>/api/auth/spa/callback`, the address after sign-out `<address>/`.
+2. Assign the roles `admin`, `operator`, `viewer` to people or groups. The first administrator of the panel is whoever
+   SPA gives the `admin` role.
+3. Put the connection key into `SPA_CONNECTION_KEY` in `.env` (or a file named by `SPA_CONNECTION_KEY_FILE`, or the
+   OpenBao secret `amnezia/spa/connection_key`, field `value` — re-read every minute) and run `docker compose up -d backend`.
+
+The users page and **Settings** show the connection: issuer, application, last synchronisation, counts, errors and
+**Synchronize now**.

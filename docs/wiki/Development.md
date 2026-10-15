@@ -14,7 +14,7 @@ backend/app/
   cluster.py     event bus, leader election, distributed locks
   workers.py     periodic job scheduler
   container.py   composition root
-  cli.py         password reset, backup and restore
+  cli.py         backup and restore
 frontend/src/
   lib/           HttpClient and resource APIs, SSE, notifications, formatting, hooks
   components/    UI primitives and form controls, charts, map, layout, clients, administration

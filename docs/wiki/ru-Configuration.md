@@ -25,7 +25,9 @@
 | `PANEL_PORT` | `8080` | Порт панели |
 | `FLOW_PORT` | `2055` | UDP-порт приёма NetFlow |
 | `SFLOW_PORT` | `6343` | UDP-порт для sFlow |
-| `INITIAL_ADMIN_USER` / `INITIAL_ADMIN_PASSWORD` | `admin` / — | Первый администратор (создаётся, если пользователей нет) |
+| `SPA_CONNECTION_KEY` | — | Ключ подключения `spa1.…`, выданный SPA (см. ниже) |
+| `SPA_CONNECTION_KEY_FILE` | — | Файл с ключом подключения вместо переменной |
+| `SPA_PUBLIC_URL` | — | Адрес панели, если он отличается от адреса запроса (для адреса возврата) |
 | `POSTGRES_PASSWORD` | — | Пароль PostgreSQL |
 | `CLICKHOUSE_PASSWORD` | — | Пароль ClickHouse |
 | `OPENBAO_VERSION` | `2.6.2` | Версия образа OpenBao |
@@ -57,3 +59,17 @@
 | | Обратный DNS (PTR) удалённых хостов | Включён по умолчанию |
 
 Настройки хранятся в PostgreSQL и применяются всеми процессами в течение 15 секунд.
+
+## Подключение к SPA
+
+Вход и доступ управляются в **SPA — единой точке авторизации** ([репозиторий](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-),
+[протокол](https://github.com/sbrw-evc/SPA-Single-point-of-authorization-/blob/main/docs/protocol.md)). Без подключения панель показывает «Это приложение не подключено к SPA».
+
+1. В SPA: **Приложения → Подключить приложение**, тип `network-control`, адрес панели (`PUBLIC_BASE_URL`).
+   Адрес возврата — `<адрес>/api/auth/spa/callback`, адрес после выхода — `<адрес>/`.
+2. Назначьте людям или группам роли `admin`, `operator`, `viewer`. Первый администратор панели — тот, кому SPA выдал роль `admin`.
+3. Укажите ключ подключения в `SPA_CONNECTION_KEY` в `.env` (или в файле из `SPA_CONNECTION_KEY_FILE`, или в секрете
+   OpenBao `amnezia/spa/connection_key`, поле `value` — перечитывается каждую минуту) и выполните `docker compose up -d backend`.
+
+Страница пользователей и **Настройки** показывают подключение: издателя, приложение, последнюю синхронизацию,
+количество пользователей, ошибки и кнопку **Синхронизировать сейчас**.

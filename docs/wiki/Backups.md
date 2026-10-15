@@ -42,11 +42,3 @@ Keep `openbao/keys/unseal.key`, `data/bao-init/init.json` and `.env` separately.
    ```
 
 5. Start the remaining services: `docker compose up -d`.
-
-## Resetting the administrator password
-
-```bash
-docker compose exec backend python -m app.cli reset-password admin
-```
-
-The command prints a temporary password, ends the user's sessions and requires a password change at sign-in.
