@@ -2,12 +2,14 @@ import type {
   Alert, ApiTokenInfo, AuditItem, BackupItem, CustomPrefix, FlowField, FlowOverview, FlowQuery, FlowRecord, FlowResult,
   FlowStatus, RouteCheck, SavedFilter, ClientBundle, GeoData, HeatCell, LivePoint, PanelUser, Range, RouterStatus, SeriesPoint,
   MikrotikVpnInfo, ServerInfo, ServerKind, Session, Settings, SiteListSummary, Summary, TopRow, VpnClient, VpnServer,
+  AuthConfig, SpaStatus,
   DeviceAction, DevicePlatform, DiscoveryResult, FlowExporter, FlowRule, FlowRuleKind, NetworkDevice, NetworkEndpoint,
   SavedView, ThreatInfo, Topology,
 } from "./types";
+import { t, tServer } from "@/i18n";
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public code?: string, public violations?: string[]) {
     super(message);
   }
 }
@@ -39,7 +41,9 @@ export class HttpClient {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
       if (r.status === 401 && !opts.silent401) this.onUnauthorized?.();
-      throw new ApiError(r.status, (data as { detail?: string }).detail || `Ошибка ${r.status}`);
+      const detail = (data as { detail?: unknown }).detail;
+      const text = typeof detail === "string" ? tServer(detail) : Array.isArray(detail) ? t("Check the entered values") : t("Error {status}", { status: r.status });
+      throw new ApiError(r.status, text, (data as { code?: string }).code, (data as { violations?: string[] }).violations);
     }
     return data as T;
   }
@@ -55,19 +59,18 @@ abstract class Resource {
   constructor(protected readonly http: HttpClient) {}
 }
 
+/** Sign-in goes through SPA (Single Point of Authorization); the application keeps only its own sessions. */
 export class AuthApi extends Resource {
-  login(username: string, password: string) {
-    return this.http.request<{ requires_2fa: boolean; user: PanelUser | null }>("POST", "/api/auth/login", { body: { username, password }, silent401: true });
+  config() { return this.http.request<AuthConfig>("GET", "/api/auth/config", { silent401: true }); }
+  /** The address that starts the sign-in at SPA and comes back to `returnTo`. */
+  startUrl(returnTo = "/", opts: { prompt?: "login" } = {}) {
+    const q = new URLSearchParams({ return: returnTo, ...(opts.prompt ? { prompt: opts.prompt } : {}) });
+    return `/api/auth/spa/start?${q}`;
   }
-  verify2fa(code: string) { return this.http.request<{ user: PanelUser }>("POST", "/api/auth/2fa", { body: { code }, silent401: true }); }
-  logout() { return this.http.post("/api/auth/logout"); }
+  logout() { return this.http.post<{ ok: boolean; redirect: string | null }>("/api/auth/logout"); }
   me() { return this.http.request<PanelUser>("GET", "/api/auth/me", { silent401: true }); }
-  changePassword(current: string, next: string) { return this.http.post("/api/auth/password", { current, new: next }); }
   sessions() { return this.http.get<Session[]>("/api/auth/sessions"); }
   revokeSession(id: string) { return this.http.delete(`/api/auth/sessions/${id}`); }
-  totpSetup() { return this.http.post<{ secret: string; uri: string; qr_svg: string }>("/api/auth/totp/setup"); }
-  totpEnable(code: string) { return this.http.post("/api/auth/totp/enable", { code }); }
-  totpDisable() { return this.http.post("/api/auth/totp/disable"); }
 }
 
 export interface ClientInput {
@@ -127,11 +130,8 @@ export class OpsApi extends Resource {
 
 export class UsersApi extends Resource {
   list() { return this.http.get<PanelUser[]>("/api/users"); }
-  create(d: { username: string; display_name: string; role: string; password: string }) { return this.http.post<PanelUser>("/api/users", d); }
-  update(id: number, d: Partial<Pick<PanelUser, "display_name" | "role" | "is_active">>) { return this.http.patch<PanelUser>(`/api/users/${id}`, d); }
-  resetPassword(id: number, password: string) { return this.http.post(`/api/users/${id}/password`, { password }); }
-  disableTotp(id: number) { return this.http.post(`/api/users/${id}/totp/disable`); }
-  remove(id: number) { return this.http.delete(`/api/users/${id}`); }
+  spa() { return this.http.get<SpaStatus>("/api/spa"); }
+  sync() { return this.http.post<{ connected: boolean; created?: number; updated?: number; disabled?: number; unchanged?: boolean }>("/api/spa/sync"); }
 }
 
 export class AdminApi extends Resource {

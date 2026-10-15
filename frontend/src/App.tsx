@@ -38,7 +38,6 @@ function Private() {
   const location = useLocation();
   if (!ready) return <PageLoader full />;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (user.must_change_password && location.pathname !== "/profile") return <Navigate to="/profile" replace />;
   return (
     <AppLayout>
       <Suspense fallback={<PageLoader />}>

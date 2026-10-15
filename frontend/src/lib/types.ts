@@ -3,17 +3,50 @@ export type ClientStatus = "active" | "blocked" | "missing";
 export type Severity = "info" | "warning" | "critical";
 export type Range = "1h" | "24h" | "7d" | "30d" | "90d";
 
+/** A person who may use Network Control, synchronised from SPA (sign-in, passwords and roles are managed there). */
 export interface PanelUser {
   id: number;
   username: string;
   display_name: string;
+  email: string;
   role: Role;
   is_active: boolean;
-  totp_enabled: boolean;
-  must_change_password: boolean;
+  source: "spa" | "local";
+  external_id: string | null;
+  groups: string[];
   created_at: string | null;
   last_login_at: string | null;
-  locked: boolean;
+  synced_at: string | null;
+}
+
+/** What the sign-in page needs to know about SPA. */
+export interface AuthConfig {
+  connected: boolean;
+  issuer: string | null;
+  account_url: string | null;
+  error: string | null;
+}
+
+/** The SPA connection as the settings page shows it. */
+export interface SpaStatus {
+  connected: boolean;
+  issuer: string | null;
+  client_id: string | null;
+  key_source: "env" | "file" | "openbao" | null;
+  key_error: string | null;
+  application: string | null;
+  application_type: string | null;
+  account_url: string | null;
+  methods: { id: string; title: string }[];
+  last_sync_at: string | null;
+  last_attempt_at: string | null;
+  error: string | null;
+  counts: { users?: number; active?: number; spa?: number };
+  last_result: { created?: number; updated?: number; disabled?: number; unchanged?: boolean };
+  roles_published_at: string | null;
+  roles: { id: Role; name: string; description: string }[];
+  sync_seconds: number;
+  redirect_uri: string | null;
 }
 
 export type ServerKind = "amnezia" | "mikrotik";
