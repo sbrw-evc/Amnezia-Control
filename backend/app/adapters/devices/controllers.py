@@ -31,7 +31,7 @@ class OmadaDriver(HttpApiDriver):
         info = await self._get("/api/info")
         self._cid = ((info or {}).get("result") or {}).get("omadacId", "")
         if not self._cid:
-            raise ExternalServiceError(f"{self.target.host}: это не контроллер Omada (нет omadacId)")
+            raise ExternalServiceError(f"{self.target.host}: this is not an Omada controller (no omadacId)")
         try:
             r = await self.http.post("/openapi/authorize/token", params={"grant_type": "client_credentials"},
                                      json={"omadacId": self._cid, "client_id": self.creds.api_key,
@@ -42,7 +42,7 @@ class OmadaDriver(HttpApiDriver):
             raise http_error(self.target.host, e) from e
         token = (data.get("result") or {}).get("accessToken")
         if not token:
-            raise ExternalServiceError(f"Omada: {data.get('msg') or 'не выдан токен — проверьте Client ID / Secret'}")
+            raise ExternalServiceError(f"Omada: {data.get('msg') or 'no token issued, check the Client ID / Secret'}")
         self.http.headers["Authorization"] = f"AccessToken={token}"
         sites = await self._open(f"/openapi/v1/{self._cid}/sites", page=1, pageSize=100)
         rows = (sites or {}).get("data") or []
@@ -50,13 +50,13 @@ class OmadaDriver(HttpApiDriver):
         site = next((s for s in rows if wanted and wanted in (str(s.get("name", "")).lower(), str(s.get("siteId", "")).lower())),
                     rows[0] if rows else None)
         if not site:
-            raise ExternalServiceError("Omada: на контроллере нет сайтов")
+            raise ExternalServiceError("Omada: the controller has no sites")
         self._site = site["siteId"]
 
     async def _open(self, path: str, **params):
         r = await self._get(path, **params)
         if not isinstance(r, dict) or r.get("errorCode", 0) != 0:
-            raise ExternalServiceError(f"Omada: {(r or {}).get('msg', 'ошибка API')}")
+            raise ExternalServiceError(f"Omada: {(r or {}).get('msg', 'API error')}")
         return r.get("result")
 
     async def collect(self) -> Snapshot:
@@ -97,13 +97,13 @@ class OmadaDriver(HttpApiDriver):
         if action == "reboot":
             mac = norm_mac(p.get("mac"))
             if not mac:
-                raise ExternalServiceError("Укажите MAC устройства Omada для перезагрузки")
+                raise ExternalServiceError("Specify the MAC of the Omada device to reboot")
             await self._send("POST", f"{base}/devices/{mac.replace(':', '-').upper()}/reboot", {})
-            return "Перезагрузка запущена"
+            return "Reboot started"
         if action == "endpoint_block":
             mac = p["mac"].replace(":", "-").upper()
             await self._send("POST", f"{base}/clients/{mac}/{'block' if p['blocked'] else 'unblock'}", {})
-            return "Клиент заблокирован" if p["blocked"] else "Клиент разблокирован"
+            return "Client blocked" if p["blocked"] else "Client unblocked"
         raise UnsupportedAction("Omada", action)
 
 
@@ -134,10 +134,10 @@ class UnifiDriver(HttpApiDriver):
                     self.http.headers["X-CSRF-Token"] = csrf
                 return
             if r.status_code not in (404, 405):
-                raise ExternalServiceError(f"UniFi: вход не удался ({r.status_code})")
+                raise ExternalServiceError(f"UniFi: login failed ({r.status_code})")
             r = await self.http.post("/api/login", json={"username": self.creds.username, "password": self.creds.password})
             if r.status_code != 200:
-                raise ExternalServiceError(f"UniFi: вход не удался ({r.status_code})")
+                raise ExternalServiceError(f"UniFi: login failed ({r.status_code})")
             self._prefix = ""
         except httpx.HTTPError as e:
             raise http_error(self.target.host, e) from e
@@ -194,12 +194,12 @@ class UnifiDriver(HttpApiDriver):
         if action == "reboot":
             mac = norm_mac(p.get("mac"))
             if not mac:
-                raise ExternalServiceError("Укажите MAC устройства UniFi для перезагрузки")
+                raise ExternalServiceError("Specify the MAC of the UniFi device to reboot")
             await self._send("POST", f"{base}/devmgr", {"cmd": "restart", "mac": mac})
-            return "Перезагрузка запущена"
+            return "Reboot started"
         if action == "endpoint_block":
             await self._send("POST", f"{base}/stamgr", {"cmd": "block-sta" if p["blocked"] else "unblock-sta", "mac": p["mac"]})
-            return "Клиент заблокирован" if p["blocked"] else "Клиент разблокирован"
+            return "Client blocked" if p["blocked"] else "Client unblocked"
         raise UnsupportedAction("UniFi", action)
 
 
@@ -217,7 +217,7 @@ class MerakiDriver(HttpApiDriver):
         org = next((o for o in orgs if wanted and wanted in (str(o.get("id")).lower(), str(o.get("name", "")).lower())),
                    orgs[0] if orgs else None)
         if not org:
-            raise ExternalServiceError("Meraki: ключ не видит ни одной организации")
+            raise ExternalServiceError("Meraki: the key sees no organizations")
         return org
 
     async def collect(self) -> Snapshot:
@@ -250,9 +250,9 @@ class MerakiDriver(HttpApiDriver):
             devices = await self._get(f"/api/v1/organizations/{org['id']}/devices", perPage=1000) or []
             dev = next((d for d in devices if norm_mac(d.get("mac")) == mac), None)
             if not dev:
-                raise ExternalServiceError("Meraki: устройство с таким MAC не найдено")
+                raise ExternalServiceError("Meraki: no device with this MAC")
             await self._send("POST", f"/api/v1/devices/{dev['serial']}/reboot", {})
-            return "Перезагрузка запущена"
+            return "Reboot started"
         raise UnsupportedAction("Meraki", action)
 
 
@@ -266,7 +266,7 @@ class RedfishDriver(HttpApiDriver):
     async def _system(self) -> tuple[str, dict]:
         members = (await self._get("/redfish/v1/Systems") or {}).get("Members") or []
         if not members:
-            raise ExternalServiceError("Redfish: нет ни одной системы")
+            raise ExternalServiceError("Redfish: no systems found")
         path = members[0]["@odata.id"]
         return path, await self._get(path) or {}
 
@@ -300,10 +300,10 @@ class RedfishDriver(HttpApiDriver):
         path, _ = await self._system()
         if action == "reboot":
             await self._send("POST", f"{path}/Actions/ComputerSystem.Reset", {"ResetType": "GracefulRestart"})
-            return "Перезагрузка запущена"
+            return "Reboot started"
         if action == "hostname":
             await self._send("PATCH", path, {"HostName": p["name"]})
-            return "Готово"
+            return "Done"
         raise UnsupportedAction("Redfish", action)
 
 

@@ -173,15 +173,15 @@ class Credentials:
 
 # Settings a driver may support. Parameters are validated here once for every vendor.
 ACTIONS: dict[str, str] = {
-    "hostname": "Имя устройства",
-    "interface": "Включение / описание интерфейса",
-    "dns": "DNS-серверы",
-    "ntp": "NTP-серверы",
-    "flow_export": "Экспорт NetFlow / IPFIX / sFlow на коллектор",
-    "reboot": "Перезагрузка",
-    "endpoint_block": "Блокировка клиента",
-    "command": "Произвольная команда CLI",
-    "backup": "Резервная копия конфигурации",
+    "hostname": "Device name",
+    "interface": "Interface state / description",
+    "dns": "DNS servers",
+    "ntp": "NTP servers",
+    "flow_export": "NetFlow / IPFIX / sFlow export to a collector",
+    "reboot": "Reboot",
+    "endpoint_block": "Client blocking",
+    "command": "Custom CLI command",
+    "backup": "Configuration backup",
 }
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,62}$")
 IFACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_./:\- ]{0,63}$")
@@ -191,52 +191,52 @@ DESC_RE = re.compile(r"^[^\"'`$;|&<>\\\r\n]{0,120}$")
 def validate_action(action: str, params: dict) -> dict:
     """Checks and normalises action parameters; values end up in vendor commands, so they are strict."""
     if action not in ACTIONS:
-        raise DomainError(f"Неизвестное действие {action}")
+        raise DomainError(f"Unknown action {action}")
     p = dict(params or {})
     if action == "hostname":
         if not NAME_RE.fullmatch(str(p.get("name", ""))):
-            raise DomainError("Имя: латиница, цифры, «.», «_», «-», до 63 символов")
+            raise DomainError("Name: Latin letters, digits, '.', '_', '-', up to 63 characters")
     elif action == "interface":
         if not IFACE_RE.fullmatch(str(p.get("name", ""))):
-            raise DomainError("Некорректное имя интерфейса")
+            raise DomainError("Invalid interface name")
         if "description" in p and p["description"] is not None and not DESC_RE.fullmatch(str(p["description"])):
-            raise DomainError("Описание: до 120 символов, без кавычек и спецсимволов")
+            raise DomainError("Description: up to 120 characters, no quotes or special characters")
         if p.get("enabled") is None and p.get("description") is None:
-            raise DomainError("Укажите состояние или описание интерфейса")
+            raise DomainError("Specify the interface state or description")
     elif action in ("dns", "ntp"):
         servers = [s.strip() for s in p.get("servers") or [] if str(s).strip()]
         if not servers or len(servers) > 4:
-            raise DomainError("Укажите от 1 до 4 серверов")
+            raise DomainError("Specify 1 to 4 servers")
         for s in servers:
             if not norm_ip(s) and not re.fullmatch(r"[a-z0-9]([a-z0-9.\-]{0,251}[a-z0-9])?", s, re.I):
-                raise DomainError(f"«{s}» не адрес и не имя хоста")
+                raise DomainError(f"'{s}' is neither an address nor a host name")
         p["servers"] = servers
     elif action == "flow_export":
         if not norm_ip(p.get("collector")):
-            raise DomainError("Адрес коллектора должен быть IP-адресом")
+            raise DomainError("The collector address must be an IP address")
         p["port"] = to_int(p.get("port"), 2055)
         if not 1 <= p["port"] <= 65535:
-            raise DomainError("Некорректный порт коллектора")
+            raise DomainError("Invalid collector port")
         p["protocol"] = p.get("protocol") or "netflow9"
         if p["protocol"] not in ("netflow5", "netflow9", "ipfix", "sflow"):
-            raise DomainError("Протокол: netflow5, netflow9, ipfix или sflow")
+            raise DomainError("Protocol: netflow5, netflow9, ipfix or sflow")
         p["enabled"] = p.get("enabled", True) is not False
     elif action == "endpoint_block":
         p["mac"] = norm_mac(p.get("mac"))
         if not p["mac"]:
-            raise DomainError("Некорректный MAC-адрес")
+            raise DomainError("Invalid MAC address")
         p["blocked"] = bool(p.get("blocked", True))
     elif action == "command":
         cmd = str(p.get("command", "")).strip()
         if not cmd or len(cmd) > 2000:
-            raise DomainError("Команда пуста или слишком длинная")
+            raise DomainError("The command is empty or too long")
         p["command"] = cmd
     return p
 
 
 class UnsupportedAction(DomainError):
     def __init__(self, vendor: str, action: str):
-        super().__init__(f"{vendor}: действие «{ACTIONS.get(action, action)}» не поддерживается")
+        super().__init__(f"{vendor}: action '{ACTIONS.get(action, action)}' is not supported")
 
 
 class DeviceDriver(ABC):

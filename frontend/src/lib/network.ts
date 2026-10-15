@@ -1,36 +1,39 @@
+import { k, t } from "@/i18n";
 import type { DeviceAction, NetworkDevice } from "./types";
 
+// Labels hold English keys: render them with t(LABEL[x]).
 export const ROLE_LABEL: Record<string, string> = {
-  router: "Маршрутизатор", switch: "Коммутатор", firewall: "Межсетевой экран", ap: "Точка доступа",
-  controller: "Контроллер", server: "Сервер", gateway: "Шлюз", other: "Другое",
+  router: k("Router"), switch: k("Switch"), firewall: k("Firewall"), ap: k("Access point"),
+  controller: k("Controller"), server: k("Server"), gateway: k("Gateway"), other: k("Other type"),
 };
-export const SEGMENT_LABEL: Record<string, string> = { home: "Дом", smb: "Малый бизнес", enterprise: "Корпоративный", any: "Универсальный" };
-export const SOURCE_LABEL: Record<string, string> = { arp: "ARP", dhcp: "DHCP", wifi: "Wi-Fi", bridge: "порт коммутатора", controller: "контроллер" };
+export const SEGMENT_LABEL: Record<string, string> = { home: k("Home"), smb: k("Small business"), enterprise: k("Enterprise"), any: k("Universal") };
+export const SOURCE_LABEL: Record<string, string> = { arp: "ARP", dhcp: "DHCP", wifi: "Wi-Fi", bridge: k("switch port"), controller: k("controller") };
 export const TRANSPORT_LABEL: Record<string, string> = { api: "REST API (HTTPS)", https: "HTTPS API", http: "HTTP API", ssh: "SSH", snmp: "SNMP" };
 export const STATUS: Record<NetworkDevice["status"], { label: string; tone: "green" | "red" | "amber" | "slate" }> = {
-  up: { label: "в сети", tone: "green" }, down: { label: "недоступно", tone: "red" }, error: { label: "ошибка опроса", tone: "amber" },
-  unknown: { label: "не опрашивалось", tone: "slate" },
+  up: { label: k("online"), tone: "green" }, down: { label: k("unreachable"), tone: "red" }, error: { label: k("poll error"), tone: "amber" },
+  unknown: { label: k("not polled"), tone: "slate" },
 };
 export const ACTION_LABEL: Record<DeviceAction, string> = {
-  hostname: "Имя устройства", interface: "Интерфейсы", dns: "DNS-серверы", ntp: "NTP-серверы", flow_export: "Экспорт потоков",
-  reboot: "Перезагрузка", endpoint_block: "Блокировка клиентов", command: "Консоль CLI", backup: "Резервная копия конфигурации",
+  hostname: k("Device name"), interface: k("Interfaces"), dns: k("DNS servers"), ntp: k("NTP servers"), flow_export: k("Flow export"),
+  reboot: k("Device reboot"), endpoint_block: k("Client blocking"), command: k("CLI console"), backup: k("Configuration backup"),
 };
 export const CRED_LABEL: Record<string, string> = {
-  username: "Пользователь", password: "Пароль", private_key: "Приватный SSH-ключ", enable_password: "Пароль enable",
-  api_key: "API key / Client ID / токен", api_secret: "API secret / Client Secret", snmp_version: "Версия SNMP",
-  snmp_community: "SNMP community", snmp_user: "SNMPv3 пользователь", snmp_auth_protocol: "SNMPv3 auth",
-  snmp_auth_password: "SNMPv3 auth-пароль", snmp_priv_protocol: "SNMPv3 priv", snmp_priv_password: "SNMPv3 priv-пароль",
+  username: k("Username"), password: k("Password"), private_key: k("SSH private key"), enable_password: k("Enable password"),
+  api_key: k("API key / Client ID / token"), api_secret: "API secret / Client Secret", snmp_version: k("SNMP version"),
+  snmp_community: "SNMP community", snmp_user: k("SNMPv3 user"), snmp_auth_protocol: "SNMPv3 auth",
+  snmp_auth_password: k("SNMPv3 auth password"), snmp_priv_protocol: "SNMPv3 priv", snmp_priv_password: k("SNMPv3 priv password"),
 };
 export const SECRET_FIELDS = new Set(["password", "private_key", "enable_password", "api_key", "api_secret", "snmp_community",
   "snmp_auth_password", "snmp_priv_password"]);
 
+const RATE_UNITS = [k("bit/s"), k("Kbit/s"), k("Mbit/s"), k("Gbit/s"), k("Tbit/s")];
+
 export function bps(v: number | null | undefined): string {
-  if (!v) return "0 бит/с";
-  const u = ["бит/с", "Кбит/с", "Мбит/с", "Гбит/с", "Тбит/с"];
+  if (!v) return `0 ${t("bit/s")}`;
   let i = 0;
   let x = v;
-  while (x >= 1000 && i < u.length - 1) { x /= 1000; i++; }
-  return `${x.toFixed(i ? 1 : 0)} ${u[i]}`;
+  while (x >= 1000 && i < RATE_UNITS.length - 1) { x /= 1000; i++; }
+  return `${x.toFixed(i ? 1 : 0)} ${t(RATE_UNITS[i])}`;
 }
 
 export function uptime(s: number | null | undefined): string {
@@ -38,10 +41,10 @@ export function uptime(s: number | null | undefined): string {
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
-  return d ? `${d} дн ${h} ч` : h ? `${h} ч ${m} мин` : `${m} мин`;
+  return d ? `${t("{n} d", { n: d })} ${t("{n} h", { n: h })}` : h ? `${t("{n} h", { n: h })} ${t("{n} min", { n: m })}` : t("{n} min", { n: m });
 }
 
 export function speed(mbps: number | null | undefined): string {
   if (!mbps) return "—";
-  return mbps >= 1000 ? `${mbps / 1000} Гбит/с` : `${mbps} Мбит/с`;
+  return mbps >= 1000 ? `${mbps / 1000} ${t("Gbit/s")}` : `${mbps} ${t("Mbit/s")}`;
 }

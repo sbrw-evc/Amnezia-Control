@@ -33,10 +33,10 @@ class BackupService:
 
     def _path(self, name: str) -> str:
         if not NAME_RE.match(name):
-            raise DomainError("Недопустимое имя архива")
+            raise DomainError("Invalid archive name")
         path = os.path.join(self._dir, name)
         if not os.path.exists(path):
-            raise NotFound("Архив не найден")
+            raise NotFound("Archive not found")
         return path
 
     def list(self) -> list[dict]:

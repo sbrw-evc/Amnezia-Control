@@ -57,12 +57,12 @@ class SshTransport:
         try:
             self._conn = await asyncio.wait_for(asyncssh.connect(self._t.host, self._port, **kw), 25)
         except asyncssh.HostKeyNotVerifiable as e:
-            raise ExternalServiceError(f"{self._t.host}: ключ SSH-сервера изменился ({e}). "
-                                       "Если устройство заменено, сбросьте сохранённый ключ") from e
+            raise ExternalServiceError(f"{self._t.host}: the SSH host key has changed ({e}). "
+                                       "If the device was replaced, reset the saved key") from e
         except asyncssh.PermissionDenied as e:
-            raise ExternalServiceError(f"{self._t.host}: SSH — неверный логин, пароль или ключ") from e
+            raise ExternalServiceError(f"{self._t.host}: SSH: wrong login, password or key") from e
         except (OSError, asyncssh.Error, asyncio.TimeoutError) as e:
-            raise ExternalServiceError(f"{self._t.host}: SSH недоступен ({e or type(e).__name__})") from e
+            raise ExternalServiceError(f"{self._t.host}: SSH is unreachable ({e or type(e).__name__})") from e
         key = self._conn.get_server_host_key()
         self.host_key = key.export_public_key().decode().strip() if key else ""
         return self._conn
@@ -73,7 +73,7 @@ class SshTransport:
         try:
             r = await asyncio.wait_for(conn.run(command, check=False), timeout)
         except asyncio.TimeoutError as e:
-            raise ExternalServiceError(f"{self._t.host}: таймаут команды") from e
+            raise ExternalServiceError(f"{self._t.host}: command timed out") from e
         except asyncssh.Error as e:
             raise ExternalServiceError(f"{self._t.host}: {e}") from e
         out = r.stdout if isinstance(r.stdout, str) else (r.stdout or b"").decode(errors="replace")
@@ -104,7 +104,7 @@ class SshTransport:
             while True:
                 left = deadline - loop.time()
                 if left <= 0:
-                    raise ExternalServiceError(f"{self._t.host}: нет приглашения CLI (таймаут)")
+                    raise ExternalServiceError(f"{self._t.host}: no CLI prompt (timed out)")
                 try:
                     chunk = await asyncio.wait_for(proc.stdout.read(65536), min(left, 1.5))
                 except asyncio.TimeoutError:
@@ -176,6 +176,6 @@ def http_error(host: str, e: Exception) -> ExternalServiceError:
     if isinstance(e, httpx.HTTPStatusError):
         code = e.response.status_code
         if code in (401, 403):
-            return ExternalServiceError(f"{host}: API отказал в доступе ({code}) — проверьте учётные данные")
-        return ExternalServiceError(f"{host}: API вернул {code}: {e.response.text[:200]}")
-    return ExternalServiceError(f"{host}: API недоступен ({e or type(e).__name__})")
+            return ExternalServiceError(f"{host}: API denied access ({code}); check the credentials")
+        return ExternalServiceError(f"{host}: API returned {code}: {e.response.text[:200]}")
+    return ExternalServiceError(f"{host}: API is unreachable ({e or type(e).__name__})")

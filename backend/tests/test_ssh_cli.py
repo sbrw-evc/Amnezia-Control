@@ -95,14 +95,14 @@ def test_cisco_ios_over_ssh():
         drv = p.driver(Target("127.0.0.1", port=port, transport="ssh", ssh_host_key=drv.learned_host_key),
                        Credentials(username="admin", password="secret"))
         out = await drv.apply("interface", validate_action("interface", {"name": "Gi1/0/2", "enabled": False, "description": "spare"}))
-        assert out == "Готово"
+        assert out == "Done"
         cmds = [c for k, c in log if k == "shell"]
         i = cmds.index("configure terminal")
         assert cmds[i:i + 6] == ["configure terminal", "interface Gi1/0/2", "shutdown", "description spare", "exit", "end"]
         assert "write memory" in cmds
         assert "Building configuration" in (await drv.apply("command", {"command": "write memory"}))
         assert (await drv.backup()).strip().startswith("hostname core-sw")
-        assert await drv.apply("reboot", {}) == "Перезагрузка запущена"
+        assert await drv.apply("reboot", {}) == "Reboot started"
         assert "reload" in [c for k, c in log if k == "shell"]
         await drv.close()
         bad = p.driver(Target("127.0.0.1", port=port, transport="ssh", ssh_host_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBadKeyBadKeyBadKeyBadKeyBadKeyBadKeyBadKey00"),
@@ -120,7 +120,7 @@ def test_linux_and_wrong_password_over_ssh():
         await drv.close()
         assert snap.facts.hostname == "openwrt" and any(i.name == "eth0" for i in snap.interfaces)
         drv = platform("linux").driver(Target("127.0.0.1", port=port, transport="ssh"), Credentials(username="admin", password="nope"))
-        with pytest.raises(Exception, match="неверный логин"):
+        with pytest.raises(Exception, match="wrong login"):
             await drv.collect()
         await drv.close()
     asyncio.run(with_server(go))

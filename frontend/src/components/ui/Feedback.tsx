@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { AlertTriangle, Inbox } from "lucide-react";
 import clsx from "clsx";
 import type { ReactNode } from "react";
+import { t } from "@/i18n";
 
 export function PageLoader({ full = false }: { full?: boolean }) {
   return (
@@ -15,7 +16,7 @@ export function PageLoader({ full = false }: { full?: boolean }) {
 export function Skeleton({ className }: { className?: string }) {
   return (
     <div className={clsx("relative overflow-hidden rounded-md bg-base-800/70", className)}>
-      <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+      <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-fg/5 to-transparent" />
     </div>
   );
 }
@@ -36,7 +37,7 @@ export function ErrorState({ error }: { error: unknown }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-sm text-slate-500">
       <div className="rounded-full bg-base-800 p-3"><AlertTriangle size={20} /></div>
-      Данные недоступны — подробности в уведомлениях
+      {t("The data is not available — see the notifications for details")}
     </div>
   );
 }

@@ -11,11 +11,11 @@ from .common import utcnow
 from .settings import SettingsService
 
 RANGES = {
-    "1h": (dt.timedelta(hours=1), dt.timedelta(minutes=5), "5 мин"),
-    "24h": (dt.timedelta(hours=24), dt.timedelta(minutes=15), "15 мин"),
-    "7d": (dt.timedelta(days=7), dt.timedelta(hours=2), "2 ч"),
-    "30d": (dt.timedelta(days=30), dt.timedelta(days=1), "1 день"),
-    "90d": (dt.timedelta(days=90), dt.timedelta(days=1), "1 день"),
+    "1h": (dt.timedelta(hours=1), dt.timedelta(minutes=5), "5 min"),
+    "24h": (dt.timedelta(hours=24), dt.timedelta(minutes=15), "15 min"),
+    "7d": (dt.timedelta(days=7), dt.timedelta(hours=2), "2 h"),
+    "30d": (dt.timedelta(days=30), dt.timedelta(days=1), "1 day"),
+    "90d": (dt.timedelta(days=90), dt.timedelta(days=1), "1 day"),
 }
 
 

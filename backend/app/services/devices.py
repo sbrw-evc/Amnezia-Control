@@ -91,7 +91,7 @@ class DeviceService:
     async def _require(self, s, device_id) -> NetworkDevice:
         d = await s.get(NetworkDevice, uuid.UUID(str(device_id)))
         if not d:
-            raise NotFound("Устройство не найдено")
+            raise NotFound("Device not found")
         return d
 
     async def get(self, device_id) -> dict:
@@ -109,19 +109,19 @@ class DeviceService:
         p = platform(data.get("platform", ""))
         host = str(data.get("host", "")).strip()
         if not host or not (norm_ip(host) or HOST_RE.fullmatch(host)):
-            raise DomainError("Укажите IP-адрес или имя хоста устройства")
+            raise DomainError("Enter the IP address or host name of the device")
         transport = data.get("transport") or next(iter(p.transports))
         if transport not in p.transports:
-            raise DomainError(f"{p.title}: доступные транспорты — {', '.join(p.transports)}")
+            raise DomainError(f"{p.title}: available transports: {', '.join(p.transports)}")
         role = data.get("role") or p.kind
         if role not in ROLES:
-            raise DomainError("Неизвестная роль устройства")
+            raise DomainError("Unknown device role")
         port = data.get("port")
         if port is not None and not (1 <= int(port) <= 65535):
-            raise DomainError("Некорректный порт")
+            raise DomainError("Invalid port")
         exporter = str(data.get("flow_exporter_ip") or "").strip()
         if exporter and not norm_ip(exporter):
-            raise DomainError("Адрес экспортёра потоков должен быть IP-адресом")
+            raise DomainError("The flow exporter address must be an IP address")
         return {"platform": p.key, "host": host, "transport": transport, "role": role, "port": int(port) if port else None,
                 "flow_exporter_ip": exporter}
 
@@ -249,7 +249,7 @@ class DeviceService:
         try:
             snap, _ = await self._collect(d, creds)
         except asyncio.TimeoutError:
-            raise DomainError("Устройство не ответило за 3 минуты")
+            raise DomainError("The device did not respond within 3 minutes")
         f = snap.facts
         return {"ok": True, "facts": dataclasses.asdict(f), "interfaces": len(snap.interfaces),
                 "neighbors": len(snap.neighbors), "endpoints": len(snap.endpoints), "children": len(snap.children)}
@@ -266,7 +266,7 @@ class DeviceService:
     async def poll(self, device_id) -> dict:
         device_id = uuid.UUID(str(device_id))
         if device_id in self._running:
-            raise DomainError("Опрос уже выполняется")
+            raise DomainError("A poll is already running")
         self._running.add(device_id)
         try:
             async with self._sem:
@@ -284,7 +284,7 @@ class DeviceService:
         try:
             snap, learned = await self._collect(d, await self._credentials(d))
         except asyncio.TimeoutError:
-            error = "таймаут опроса (3 мин)"
+            error = "Poll timed out (3 min)"
         except DomainError as e:
             error = e.message
         except Exception as e:  # a driver bug must not stop the poller
@@ -313,7 +313,7 @@ class DeviceService:
             await self._store_endpoints(device_id, snap)
             await self._alerts.resolve(f"device.down.{device_id}")
         elif failures >= 2:
-            await self._alerts.raise_(f"device.down.{device_id}", Severity.CRITICAL, f"Устройство недоступно: {name}",
+            await self._alerts.raise_(f"device.down.{device_id}", Severity.CRITICAL, f"Device is unreachable: {name}",
                                       error, str(device_id), link=f"/devices/{device_id}")
         self._bus.publish("devices", {"id": str(device_id), "action": "polled", "status": "up" if snap else "error"})
         return {"ok": snap is not None, "error": error}
@@ -394,7 +394,7 @@ class DeviceService:
     async def apply(self, actor: Actor, device_id, action: str, params: dict) -> dict:
         p = validate_action(action, params) if action != "flow_export" or (params or {}).get("collector") else {}
         if action in ADMIN_ACTIONS and actor.role != "admin":
-            raise DomainError("Действие доступно только администратору")
+            raise DomainError("Only an administrator can do this")
         if action == "flow_export" and not (params or {}).get("collector"):
             params = {**(params or {}), "collector": await self._settings.get("flow_collector_host")
                       or self._defaults.get("collector_host", ""),
@@ -404,7 +404,8 @@ class DeviceService:
             d = await self._require(s, device_id)
         pl = platform(d.platform)
         if action not in pl.capabilities(d.transport):
-            raise DomainError(f"{pl.title}: «{action}» не поддерживается через {d.transport or 'этот транспорт'}")
+            raise DomainError(f"{pl.title}: '{action}' is not supported over {d.transport}" if d.transport
+                              else f"{pl.title}: '{action}' is not supported")
         drv = pl.driver(self._target(d), await self._credentials(d))
         ok, result = False, ""
         try:
@@ -476,7 +477,7 @@ class DeviceService:
         async with self._db.session() as s:
             e = await s.get(NetworkEndpoint, mac)
             if not e:
-                raise NotFound("Клиент сети не найден")
+                raise NotFound("Network client not found")
             if "alias" in data:
                 e.alias = str(data["alias"] or "")[:128]
             if "note" in data:
@@ -501,7 +502,7 @@ class DeviceService:
             d = devices.get(sight.device_id)
             if d and "endpoint_block" in platform(d.platform).capabilities(d.transport):
                 return await self.apply(actor, d.id, "endpoint_block", {"mac": mac, "blocked": blocked})
-        raise DomainError("Нет устройства, умеющего блокировать этого клиента (нужны UniFi, Omada или Keenetic)")
+        raise DomainError("No device can block this client (UniFi, Omada or Keenetic is required)")
 
     async def purge_endpoints(self, days: int) -> None:
         async with self._db.session() as s:
@@ -516,7 +517,7 @@ class DeviceService:
             net = ipaddress.ip_network(target, strict=False)
         except ValueError:
             if not HOST_RE.fullmatch(target):
-                raise DomainError("Укажите адрес, имя хоста или подсеть (до /22)")
+                raise DomainError("Enter an address, a host name or a subnet (up to /22)")
             return [await discovery.probe(target, community)]
         try:
             found = await discovery.scan(str(net), community) if net.num_addresses > 1 else \
@@ -539,7 +540,7 @@ class DeviceService:
                 return
             s.add(NetworkDevice(name="MikroTik", platform="mikrotik", host=host, transport="ssh", role="router",
                                 use_system_key=True, created_by="system", poll_seconds=300,
-                                note="Добавлен автоматически: маршрутизатор из ROUTER_HOST"))
+                                note="Added automatically: the router from ROUTER_HOST"))
 
     async def exporter_map(self) -> dict[str, dict]:
         """Exporter address (IPv4 or IPv6) → device, for flow enrichment: the configured exporter IP, the host and

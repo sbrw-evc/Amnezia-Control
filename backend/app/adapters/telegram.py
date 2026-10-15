@@ -22,10 +22,10 @@ class TelegramNotifier(Notifier):
     async def set_token(self, token: str) -> None:
         token = token.strip()
         if ":" not in token:
-            raise DomainError("Неверный формат токена бота")
+            raise DomainError("Invalid bot token format")
         r = await self._http.get(f"https://api.telegram.org/bot{token}/getMe")
         if r.status_code != 200 or not r.json().get("ok"):
-            raise DomainError("Telegram не принял токен")
+            raise DomainError("Telegram rejected the token")
         await self._secrets.put(TOKEN_SECRET, {"token": token, "bot": r.json()["result"].get("username", "")})
 
     async def bot_name(self) -> str | None:
@@ -35,12 +35,12 @@ class TelegramNotifier(Notifier):
     async def send(self, text: str) -> None:
         token, chat = await self._token(), await self._chat_id()
         if not token or not chat:
-            raise DomainError("Telegram не настроен")
+            raise DomainError("Telegram is not set up")
         try:
             r = await self._http.post(f"https://api.telegram.org/bot{token}/sendMessage",
                                       json={"chat_id": chat, "text": text, "parse_mode": "HTML",
                                             "disable_web_page_preview": True})
         except httpx.HTTPError as e:
-            raise ExternalServiceError(f"Telegram недоступен: {e}") from e
+            raise ExternalServiceError(f"Telegram is unreachable: {e}") from e
         if r.status_code != 200:
             raise ExternalServiceError(f"Telegram: {r.json().get('description', r.status_code)}")

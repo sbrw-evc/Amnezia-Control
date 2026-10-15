@@ -54,7 +54,7 @@ class AlertService:
         async with self._db.session() as s:
             a = await AlertRepo(s).get(alert_id)
             if not a:
-                raise NotFound("Алерт не найден")
+                raise NotFound("Alert not found")
             a.acknowledged_by = actor.username
 
     async def list(self, include_resolved: bool = False) -> list[dict]:

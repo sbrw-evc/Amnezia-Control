@@ -19,7 +19,7 @@ from .audit import AuditService
 from .common import Actor, utcnow
 from .flowfilter import EXPORTER_NAME as EXPORTER_NAME_SQL, FIELDS, FilterParser, dimension, ip_key, ip_text
 
-UNITS = {"bps": ("Bytes * 8", "бит/с"), "pps": ("Packets", "пакетов/с"), "fps": ("Flows", "потоков/с")}
+UNITS = {"bps": ("Bytes * 8", "bit/s"), "pps": ("Packets", "packets/s"), "fps": ("Flows", "flows/s")}
 LIMIT_TYPES = ("avg", "max", "last")
 GRAPHS = ("stacked", "stacked100", "lines", "grid", "sankey")
 
@@ -271,7 +271,7 @@ class FlowService:
         if start.tzinfo is None:
             start = start.replace(tzinfo=dt.timezone.utc)
         if start >= end:
-            raise DomainError("Начало периода должно быть раньше конца")
+            raise DomainError("The start of the period must be before its end")
         duration = (end - start).total_seconds()
         points = max(20, min(int(q.get("points") or 200), 600))
         step = max(60, int(math.ceil(duration / points / 60) * 60))
@@ -282,7 +282,7 @@ class FlowService:
         dims = [dimension(d) for d in (q.get("dimensions") or [])][:6]
         bidirectional = bool(q.get("bidirectional")) and graph != "sankey"
         if graph == "sankey" and len(dims) < 2:
-            raise DomainError("Для Sankey выберите минимум два измерения")
+            raise DomainError("Select at least two dimensions for Sankey")
 
         parser = FilterParser(q.get("filter") or "")
         where = parser.compile()
@@ -292,7 +292,7 @@ class FlowService:
             step = max(step, AGG_TABLES[table][0])
         base = f"TimeReceived >= {{start:DateTime}} AND TimeReceived < {{end:DateTime}} AND ({where})"
         metric = UNITS[unit][0]
-        dim_sql = [d.dimension for d in dims] or ["'Всего'"]
+        dim_sql = [d.dimension for d in dims] or ["'Total'"]
         dim_cols = ", ".join(f"{s} AS d{i}" for i, s in enumerate(dim_sql))
         dim_names = ", ".join(f"d{i}" for i in range(len(dim_sql)))
 
@@ -314,7 +314,7 @@ class FlowService:
                 f"GROUP BY {dim_names} ORDER BY v DESC", params)
             return {**self._sankey(rows, dims, unit), "table": table}
 
-        key_expr = (f"if({in_top}, [{dim_names}], ['Прочее'])" if dims else "['Всего']")
+        key_expr = (f"if({in_top}, [{dim_names}], ['Other'])" if dims else "['Total']")
         dir_expr = "toString(Direction)" if bidirectional else "'out'"
         rows = await self._ch.query(
             f"SELECT toStartOfInterval(TimeReceived, INTERVAL {step} SECOND) AS t, {dir_expr} AS dir, key, "
@@ -345,7 +345,7 @@ class FlowService:
                         "values": [round(v * sign, 3) for v in values],
                         "stats": {"min": min(values), "max": max(values), "last": values[-1] if values else 0,
                                   "avg": avg, "p95": _percentile(values, 0.95), "total": total}})
-        out.sort(key=lambda s: (s["direction"] != "out", s["name"] == "Прочее", -s["stats"]["avg"]))
+        out.sort(key=lambda s: (s["direction"] != "out", s["name"] == "Other", -s["stats"]["avg"]))
 
         previous = None
         if q.get("previousPeriod") and graph in ("stacked", "lines"):
@@ -377,11 +377,11 @@ class FlowService:
 
     @staticmethod
     def _previous_label(duration: float) -> str:
-        for limit, label in ((3600, "час назад"), (86400, "день назад"), (7 * 86400, "неделю назад"),
-                             (31 * 86400, "месяц назад")):
+        for limit, label in ((3600, "an hour ago"), (86400, "a day ago"), (7 * 86400, "a week ago"),
+                             (31 * 86400, "a month ago")):
             if duration <= limit:
                 return label
-        return "год назад"
+        return "a year ago"
 
     @staticmethod
     def _sankey(rows: list[dict], dims, unit: str) -> dict:
@@ -419,7 +419,7 @@ class FlowService:
             repo = SavedFilterRepo(s)
             f = await repo.require(filter_id)
             if f.created_by != actor.username and actor.role != "admin":
-                raise DomainError("Можно удалять только свои фильтры")
+                raise DomainError("You can delete only your own filters")
             await repo.remove(f)
 
     # ---------- aggregates ----------
@@ -531,7 +531,7 @@ class FlowService:
                     r = await http.get(lst["url"])
                     r.raise_for_status()
                 except httpx.HTTPError as e:
-                    status[lst["name"]] = f"ошибка: {e}"
+                    status[lst["name"]] = f"Error: {e}"
                     continue
                 count = 0
                 for net in parse_blocklist(r.text):
@@ -579,9 +579,9 @@ class FlowService:
         async with self._db.session() as s:
             v = await s.get(SavedView, view_id)
             if not v:
-                raise DomainError("Представление не найдено")
+                raise DomainError("View not found")
             if v.created_by != actor.username and actor.role != "admin":
-                raise DomainError("Можно удалять только свои представления")
+                raise DomainError("You can delete only your own views")
             await s.delete(v)
 
 

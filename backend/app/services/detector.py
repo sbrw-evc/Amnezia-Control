@@ -25,31 +25,31 @@ from .flowfilter import FIELDS, NO_EXPORTER, FilterParser, ch_ip, dimension, ip_
 log = logging.getLogger(__name__)
 
 KINDS: dict[str, dict] = {
-    "threshold": {"title": "Порог трафика", "defaults": {"dimensions": ["LocalHost"], "metric": "bps", "operator": ">",
+    "threshold": {"title": "Traffic threshold", "defaults": {"dimensions": ["LocalHost"], "metric": "bps", "operator": ">",
                                                          "threshold": 100_000_000, "window": 300}},
-    "ddos_volumetric": {"title": "DDoS: объёмная атака", "defaults": {"bps": 500_000_000, "pps": 100_000, "window": 60,
+    "ddos_volumetric": {"title": "DDoS: volumetric attack", "defaults": {"bps": 500_000_000, "pps": 100_000, "window": 60,
                                                                      "k": 0, "baseline_window": 3600}},
     "ddos_syn": {"title": "DDoS: SYN flood", "defaults": {"pps": 2000, "ratio": 0.6, "window": 60}},
-    "scan": {"title": "Сканирование портов / хостов", "defaults": {"mode": "inbound", "ports": 100, "hosts": 50,
+    "scan": {"title": "Port / host scan", "defaults": {"mode": "inbound", "ports": 100, "hosts": 50,
                                                                    "window": 300}},
-    "anomaly": {"title": "Аномалия относительно недельной нормы", "defaults": {
+    "anomaly": {"title": "Anomaly against the weekly baseline", "defaults": {
         "dimensions": [], "weeks": 3, "k": 3, "ratio": 0.5, "min_bps": 1_000_000, "direction": "up"}},
-    "traffic_drop": {"title": "Падение трафика", "defaults": {"dimensions": [], "weeks": 3, "ratio": 0.2,
+    "traffic_drop": {"title": "Traffic drop", "defaults": {"dimensions": [], "weeks": 3, "ratio": 0.2,
                                                               "min_bps": 1_000_000}},
-    "exporter_silent": {"title": "Экспортёр молчит", "defaults": {"minutes": 10}},
-    "threat_contact": {"title": "Контакт с адресом из списков угроз", "defaults": {"window": 300, "min_flows": 1}},
-    "link_utilization": {"title": "Загрузка канала", "defaults": {"percent": 85, "window": 300}},
+    "exporter_silent": {"title": "Exporter is silent", "defaults": {"minutes": 10}},
+    "threat_contact": {"title": "Contact with a threat-listed address", "defaults": {"window": 300, "min_flows": 1}},
+    "link_utilization": {"title": "Link utilization", "defaults": {"percent": 85, "window": 300}},
 }
 MAX_GROUPS = 50
 
 
 def fmt_rate(v: float, unit: str = "bps") -> str:
     if unit == "pps":
-        return f"{v:,.0f} пак/с".replace(",", " ")
-    for div, name in ((1e9, "Гбит/с"), (1e6, "Мбит/с"), (1e3, "Кбит/с")):
+        return f"{v:,.0f} pps".replace(",", " ")
+    for div, name in ((1e9, "Gbit/s"), (1e6, "Mbit/s"), (1e3, "kbit/s")):
         if v >= div:
             return f"{v / div:.1f} {name}"
-    return f"{v:.0f} бит/с"
+    return f"{v:.0f} bit/s"
 
 
 def flows_link(filter_text: str, dimensions: list[str], minutes: int = 60, graph: str = "stacked") -> str:
@@ -77,13 +77,13 @@ class Detector:
     def _validate(data: dict) -> dict:
         kind = data.get("kind")
         if kind not in KINDS:
-            raise DomainError("Неизвестный тип правила")
+            raise DomainError("Unknown rule type")
         FilterParser(data.get("filter") or "").compile()
         params = {**KINDS[kind]["defaults"], **(data.get("params") or {})}
         for d in params.get("dimensions") or []:
             dimension(d)
         if len(params.get("dimensions") or []) > 3:
-            raise DomainError("Не больше трёх измерений")
+            raise DomainError("No more than three dimensions")
         for key in ("window", "baseline_window"):
             if key in params:
                 params[key] = max(60, min(int(params[key]), 86400))
@@ -92,7 +92,7 @@ class Detector:
         try:
             severity = Severity(data.get("severity") or "warning")
         except ValueError:
-            raise DomainError("Некорректная важность")
+            raise DomainError("Invalid severity")
         return {"kind": kind, "params": params, "severity": severity}
 
     @staticmethod
@@ -121,7 +121,7 @@ class Detector:
         async with self._db.session() as s:
             r = await s.get(FlowRule, rule_id)
             if not r:
-                raise NotFound("Правило не найдено")
+                raise NotFound("Rule not found")
             v = self._validate({"kind": r.kind, "params": {**r.params, **(data.get("params") or {})},
                                 "filter": data.get("filter", r.filter), "severity": data.get("severity", r.severity.value)})
             r.params, r.severity = v["params"], v["severity"]
@@ -140,7 +140,7 @@ class Detector:
         async with self._db.session() as s:
             r = await s.get(FlowRule, rule_id)
             if not r:
-                raise NotFound("Правило не найдено")
+                raise NotFound("Rule not found")
             await s.delete(r)
             self._audit.record(s, actor, "flows.rule_deleted", "rule", rule_id, r.name)
         await self._alerts.resolve_prefix_except(f"flow.rule.{rule_id}.", set())
@@ -149,11 +149,11 @@ class Detector:
         async with self._db.session() as s:
             if (await s.execute(select(FlowRule.id).limit(1))).first():
                 return
-            for kind, name, sev in (("ddos_volumetric", "Входящая DDoS-атака", Severity.CRITICAL),
+            for kind, name, sev in (("ddos_volumetric", "Incoming DDoS attack", Severity.CRITICAL),
                                     ("ddos_syn", "SYN flood", Severity.CRITICAL),
-                                    ("threat_contact", "Контакт с вредоносным адресом", Severity.WARNING),
-                                    ("scan", "Сканирование из интернета", Severity.INFO),
-                                    ("exporter_silent", "Экспортёр NetFlow молчит", Severity.WARNING)):
+                                    ("threat_contact", "Contact with a malicious address", Severity.WARNING),
+                                    ("scan", "Scan from the internet", Severity.INFO),
+                                    ("exporter_silent", "NetFlow exporter is silent", Severity.WARNING)):
                 s.add(FlowRule(name=name, kind=kind, severity=sev, params=self._validate({"kind": kind})["params"],
                                enabled=kind != "scan", created_by="system", state={}))
 
@@ -180,7 +180,7 @@ class Detector:
         async with self._db.session() as s:
             r = await s.get(FlowRule, rule_id)
             if not r:
-                raise NotFound("Правило не найдено")
+                raise NotFound("Rule not found")
         groups = await self.evaluate(r)
         return [{"group": g, **v} for g, v in groups.items()]
 
@@ -236,11 +236,11 @@ class Detector:
             f"ORDER BY v DESC LIMIT {MAX_GROUPS}", params)
         out = {}
         for row in rows:
-            label = " · ".join(str(row[f"d{i}"]) for i in range(len(dims))) or "весь трафик"
+            label = " · ".join(str(row[f"d{i}"]) for i in range(len(dims))) or "all traffic"
             filt = " AND ".join(f"{d.name} = '{row[f'd{i}']}'" for i, d in enumerate(dims) if d.kind in ("string", "enum"))
             out[label] = {"label": label, "value": float(row["v"]),
                           "text": f"{fmt_rate(float(row['v']), p.get('metric', 'bps'))} {op} "
-                                  f"{fmt_rate(float(p['threshold']), p.get('metric', 'bps'))} за {w // 60} мин",
+                                  f"{fmt_rate(float(p['threshold']), p.get('metric', 'bps'))} over {w // 60} min",
                           "link": flows_link(self._and(ftext, filt) if filt else ftext, p.get("dimensions") or [])}
         return out
 
@@ -265,7 +265,7 @@ class Detector:
             if base and bps < float(p["k"]) * base.get(r["ip"], 0):
                 continue
             out[r["ip"]] = {"label": f"{r['host']} ({r['ip']})" if r["host"] != r["ip"] else r["ip"], "value": bps,
-                            "text": f"{fmt_rate(bps)}, {fmt_rate(float(r['pps']), 'pps')} от {r['sources']} источников",
+                            "text": f"{fmt_rate(bps)}, {fmt_rate(float(r['pps']), 'pps')} from {r['sources']} sources",
                             "link": flows_link(self._and(ftext, f"LocalAddr = {r['ip']} AND Direction = in"),
                                                ["RemoteASName", "RemoteAddr"], 30)}
         return out
@@ -280,8 +280,8 @@ class Detector:
             f"GROUP BY ip HAVING syn_pps >= {float(p['pps'])} AND ratio >= {float(p['ratio'])} "
             f"ORDER BY syn_pps DESC LIMIT {MAX_GROUPS}", params)
         return {r["ip"]: {"label": r["ip"], "value": float(r["syn_pps"]),
-                          "text": f"{fmt_rate(float(r['syn_pps']), 'pps')} SYN без ACK ({float(r['ratio']) * 100:.0f}% TCP) "
-                                  f"от {r['sources']} источников",
+                          "text": f"{fmt_rate(float(r['syn_pps']), 'pps')} SYN without ACK ({float(r['ratio']) * 100:.0f}% of TCP) "
+                                  f"from {r['sources']} sources",
                           "link": flows_link(self._and(ftext, f"LocalAddr = {r['ip']} AND Proto = tcp"),
                                              ["RemoteAddr", "LocalPort"], 30)} for r in rows}
 
@@ -293,8 +293,8 @@ class Detector:
                 f"uniqExact(RemoteAddr) AS hosts, uniqExact(RemotePort) AS ports FROM flows "
                 f"WHERE TimeReceived >= now() - {w} AND Direction = 'out' AND ({where}) GROUP BY ip, host "
                 f"HAVING hosts >= {int(p['hosts'])} ORDER BY hosts DESC LIMIT {MAX_GROUPS}", params)
-            return {r["ip"]: {"label": f"{r['host']} сканирует сеть", "value": int(r["hosts"]),
-                              "text": f"{r['hosts']} адресов, {r['ports']} портов за {w // 60} мин — возможно, заражённое устройство",
+            return {r["ip"]: {"label": f"{r['host']} is scanning the network", "value": int(r["hosts"]),
+                              "text": f"{r['hosts']} addresses and {r['ports']} ports in {w // 60} min, possibly an infected device",
                               "link": flows_link(self._and(ftext, f"LocalAddr = {r['ip']}"), ["RemotePort", "RemoteCountry"])}
                     for r in rows}
         rows = await self._q(
@@ -303,7 +303,7 @@ class Detector:
             f"WHERE TimeReceived >= now() - {w} AND Direction = 'in' AND ({where}) GROUP BY ip "
             f"HAVING ports >= {int(p['ports'])} OR hosts >= {int(p['hosts'])} ORDER BY ports DESC LIMIT {MAX_GROUPS}", params)
         return {r["ip"]: {"label": f"{r['ip']} ({r['country'] or '—'}, {r['asname'] or 'AS?'})", "value": int(r["ports"]),
-                          "text": f"{r['ports']} портов на {r['hosts']} адресах за {w // 60} мин",
+                          "text": f"{r['ports']} ports on {r['hosts']} addresses in {w // 60} min",
                           "link": flows_link(self._and(ftext, f"RemoteAddr = {r['ip']}"), ["LocalAddr", "LocalPort"])}
                 for r in rows}
 
@@ -313,7 +313,7 @@ class Detector:
         t0 = (await self._q("SELECT toStartOfInterval(now() - 300, INTERVAL 300 SECOND) AS t", {}))[0]["t"]
         weeks = max(1, min(int(p.get("weeks", 3)), 8 if table == "flows_5m" else 4))
         stamps = [f"toDateTime('{t0}') - INTERVAL {7 * i} DAY" for i in range(0, weeks + 1)]
-        cols = ", ".join(f"{d.dimension} AS d{i}" for i, d in enumerate(dims)) or "'всего' AS d0"
+        cols = ", ".join(f"{d.dimension} AS d{i}" for i, d in enumerate(dims)) or "'total' AS d0"
         names = ", ".join(f"d{i}" for i in range(max(1, len(dims))))
         rows = await self._q(
             f"SELECT {names}, toString(t) AS t, v FROM (SELECT {cols}, toStartOfInterval(TimeReceived, INTERVAL 300 SECOND) AS t, "
@@ -353,7 +353,7 @@ class Detector:
             if drop:
                 if med < float(p["min_bps"]) or a >= float(p["ratio"]) * med:
                     continue
-                text = f"сейчас {fmt_rate(a)}, обычно {fmt_rate(med)} (меньше {float(p['ratio']) * 100:.0f}%)"
+                text = f"Now {fmt_rate(a)}, usually {fmt_rate(med)} (below {float(p['ratio']) * 100:.0f}%)"
             else:
                 if max(a, med) < float(p["min_bps"]):
                     continue
@@ -363,7 +363,7 @@ class Detector:
                 direction = p.get("direction", "up")
                 if (direction == "up" and dev <= 0) or (direction == "down" and dev >= 0):
                     continue
-                text = f"сейчас {fmt_rate(a)}, обычно {fmt_rate(med)} в это время ({'+' if dev > 0 else ''}{dev / med * 100 if med else 100:.0f}%)"
+                text = f"Now {fmt_rate(a)}, usually {fmt_rate(med)} at this time ({'+' if dev > 0 else ''}{dev / med * 100 if med else 100:.0f}%)"
             out[g] = {"label": g, "value": a, "text": text, "link": flows_link(ftext, dim_names, 180, "lines")}
         return dict(sorted(out.items(), key=lambda kv: -abs(kv[1]["value"]))[:MAX_GROUPS])
 
@@ -377,7 +377,7 @@ class Detector:
             f"toString(max(TimeReceived)) AS last FROM flows WHERE TimeReceived >= now() - 86400 "
             f"AND NOT ({NO_EXPORTER}) GROUP BY ip, name HAVING max(TimeReceived) < now() - {m * 60}", {})
         return {r["ip"]: {"label": r["name"], "value": 0,
-                          "text": f"нет потоков с {r['last']} UTC (дольше {m} мин)", "link": "/flows?tab=exporters"}
+                          "text": f"No flows since {r['last']} UTC (over {m} min)", "link": "/flows?tab=exporters"}
                 for r in rows}
 
     async def _k_threat_contact(self, p, where, params, ftext):
@@ -390,7 +390,7 @@ class Detector:
             f"HAVING flows >= {int(p.get('min_flows', 1))} ORDER BY flows DESC LIMIT {MAX_GROUPS}", params)
         return {f"{r['list']}|{r['ip']}": {
             "label": f"{r['host']} ↔ {r['list']}", "value": int(r["flows"]),
-            "text": f"{r['flows']} потоков с {', '.join(r['remotes'])} ({r['list']})",
+            "text": f"{r['flows']} flows with {', '.join(r['remotes'])} ({r['list']})",
             "link": flows_link(self._and(ftext, f"LocalAddr = {r['ip']} AND Threat != ''"), ["RemoteAddr", "Application"])}
             for r in rows}
 
@@ -407,7 +407,7 @@ class Detector:
             f"HAVING speed > 0 AND bps * 100 / (speed * 1000000) >= {float(p['percent'])} ORDER BY bps DESC LIMIT {MAX_GROUPS}",
             {**params})
         return {f"{r['ip']}|{r['idx']}|{r['dir']}": {
-            "label": f"{r['exporter']} {r['name']} ({'вход' if r['dir'] == 'in' else 'выход'})", "value": float(r["bps"]),
-            "text": f"{fmt_rate(float(r['bps']))} из {int(r['speed'])} Мбит/с "
+            "label": f"{r['exporter']} {r['name']} ({'in' if r['dir'] == 'in' else 'out'})", "value": float(r["bps"]),
+            "text": f"{fmt_rate(float(r['bps']))} of {int(r['speed'])} Mbit/s "
                     f"({float(r['bps']) * 100 / (int(r['speed']) * 1e6):.0f}%)",
             "link": flows_link(f"Exporter = {r['ip']}", ["LocalHost", "Application"], 30)} for r in rows}

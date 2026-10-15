@@ -51,14 +51,14 @@ class MikrotikDriver(DeviceDriver):
                 if re.search(r"bad command|syntax error|no such command", out, re.I):
                     if optional:
                         return []
-                    raise ExternalServiceError(f"{self.target.host}: RouterOS не понимает :serialize — нужна 7.13+ "
-                                               "или транспорт REST API")
+                    raise ExternalServiceError(f"{self.target.host}: RouterOS does not support :serialize; it needs 7.13+ "
+                                               "or the REST API transport")
                 data = json.loads(out.strip() or "[]")
         except (httpx.HTTPError, ValueError) as e:
             if optional:
                 return []
             raise http_error(self.target.host, e) if isinstance(e, httpx.HTTPError) else \
-                ExternalServiceError(f"{self.target.host}: неожиданный ответ RouterOS") from e
+                ExternalServiceError(f"{self.target.host}: unexpected RouterOS response") from e
         finally:
             if self._ssh and self._ssh.host_key:
                 self.learned_host_key = self._ssh.host_key
@@ -189,7 +189,7 @@ class MikrotikDriver(DeviceDriver):
                     f"version={FLOW_VERSIONS[p['protocol']]}}}")
             else:
                 await self._cli(f"/ip traffic-flow target remove {target}")
-            return f"Экспорт потоков {'включён' if p['enabled'] else 'выключен'}: {p['collector']}:{p['port']}"
+            return f"Flow export {'enabled' if p['enabled'] else 'disabled'}: {p['collector']}:{p['port']}"
         elif action == "reboot":
             if self._ssh:
                 await self._ssh.run(":execute \"/system reboot\"", timeout=10)
@@ -198,12 +198,12 @@ class MikrotikDriver(DeviceDriver):
                     await self._http.post("/rest/system/reboot", json={}, timeout=10)
                 except httpx.HTTPError:
                     pass  # the router drops the connection while rebooting
-            return "Перезагрузка запущена"
+            return "Reboot started"
         elif action == "command":
             return await self._cli(p["command"])
         else:
             return await super().apply(action, p)
-        return "Готово"
+        return "Done"
 
     async def backup(self) -> str:
         return await self._cli("/export terse")

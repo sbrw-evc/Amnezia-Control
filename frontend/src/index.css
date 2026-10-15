@@ -1,45 +1,145 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "leaflet/dist/leaflet.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens of the Umbrella family (Umbrella Monitoring app/web styles.css; Inventory DB docs/design.md), as RGB
+   channels so Tailwind can add opacity. Light is the default; data-theme="dark" on <html> switches. */
+:root {
+  color-scheme: light;
+  --c-chrome: 233 237 242;
+  --c-bg: 244 246 249;
+  --c-surface: 255 255 255;
+  --c-surface-2: 248 250 252;
+  --c-surface-3: 241 245 249;
+  --c-border: 221 227 235;
+  --c-border-strong: 180 191 207;
+  --c-fg: 15 23 42;
+  --c-fg-2: 30 41 59;
+  --c-muted: 91 100 117;
+  --c-subtle: 100 110 128;
+  --c-faint: 148 156 170;
+  --c-accent: 37 99 235;
+  --c-accent-soft: 232 239 255;
+  --c-ok: 21 128 61;
+  --c-warn: 161 98 7;
+  --c-error: 185 28 28;
+  --c-info: 29 78 216;
+  --c-purple: 126 34 206;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --btn-primary-bg: #2563eb;
+  --btn-primary-shadow: 0 1px 2px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --btn-secondary-bg: #ffffff;
+  --btn-secondary-border: #d5dce6;
+  --btn-secondary-hover: #f3f6fa;
+  --input-bg: #ffffff;
+  --input-border: #d5dce6;
+  --input-border-hover: #b4bfcf;
+  --segment-bg: #eef2f6;
+  --segment-on: #ffffff;
+  --focus: 0 0 0 3px rgba(37, 99, 235, 0.35);
+  --backdrop: rgba(8, 12, 22, 0.45);
+  --scrollbar-thumb: rgba(15, 23, 42, 0.22);
+  --chart-grid: #e5e9f0;
+  --chart-text: #5b6475;
+  --map-bg: #e9edf2;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --c-chrome: 7 11 20;
+  --c-bg: 11 18 32;
+  --c-surface: 18 26 43;
+  --c-surface-2: 23 32 54;
+  --c-surface-3: 30 41 66;
+  --c-border: 38 50 74;
+  --c-border-strong: 58 72 102;
+  --c-fg: 229 233 242;
+  --c-fg-2: 203 210 225;
+  --c-muted: 154 164 184;
+  --c-subtle: 124 135 157;
+  --c-faint: 92 103 124;
+  --c-accent: 91 140 255;
+  --c-accent-soft: 27 42 77;
+  --c-ok: 74 222 128;
+  --c-warn: 250 204 21;
+  --c-error: 248 113 113;
+  --c-info: 147 180 255;
+  --c-purple: 192 132 252;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --btn-primary-bg: #4f7fff;
+  --btn-primary-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --btn-secondary-bg: #172036;
+  --btn-secondary-border: #2c3954;
+  --btn-secondary-hover: #1d2842;
+  --input-bg: #0f1727;
+  --input-border: #2c3954;
+  --input-border-hover: #3c4b6b;
+  --segment-bg: #0f1727;
+  --segment-on: #24304b;
+  --focus: 0 0 0 3px rgba(91, 140, 255, 0.4);
+  --scrollbar-thumb: rgba(229, 233, 242, 0.2);
+  --chart-grid: #26324a;
+  --chart-text: #9aa4b8;
+  --map-bg: #0b1220;
+}
+
 @layer base {
-  :root { color-scheme: dark; }
   html, body, #root { height: 100%; }
-  input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(.7); cursor: pointer; opacity: .8; }
-  body { font-feature-settings: "cv11", "ss01"; }
-  ::selection { background: rgba(59, 130, 246, .35); }
-  * { scrollbar-width: thin; scrollbar-color: #334160 transparent; }
+  html { font-size: 14px; }
+  body { @apply bg-chrome text-slate-200; }
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .8; }
+  [data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(.7); }
+  ::selection { background: rgb(var(--c-accent) / .25); }
+  * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
 }
 
 @layer components {
-  .card { @apply rounded-xl border border-base-700/70 bg-base-900/80 backdrop-blur-sm; }
-  .card-head { @apply flex items-center justify-between gap-3 border-b border-base-700/60 px-4 py-3; }
-  .card-title { @apply text-[13px] font-semibold uppercase tracking-wide text-slate-400; }
-  .input { @apply w-full rounded-lg border border-base-700 bg-base-950/70 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-accent focus:ring-2 focus:ring-accent/25; }
-  .label { @apply mb-1 block text-xs font-medium text-slate-400; }
-  .btn { @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium transition active:scale-[.98] disabled:pointer-events-none disabled:opacity-50; }
-  .btn-primary { @apply btn border-accent bg-accent text-white hover:bg-blue-500 shadow-glow; }
-  .btn-ghost { @apply btn border-base-700 bg-base-850 text-slate-200 hover:border-base-600 hover:bg-base-800; }
-  .btn-danger { @apply btn border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20; }
-  .btn-sm { @apply px-2.5 py-1.5 text-xs; }
-  .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-base-700 bg-base-850 px-2.5 py-1 text-xs text-slate-300 transition hover:border-base-600; }
-  .chip-on { @apply border-accent/60 bg-accent/15 text-blue-200; }
+  .card { @apply rounded-card border border-base-700 bg-base-900 shadow-card; }
+  .card-head { @apply flex items-center justify-between gap-3 px-[18px] pb-0 pt-4; }
+  .card-title { @apply text-[15px] font-semibold text-slate-100; }
+  .input {
+    @apply h-[38px] w-full rounded-control border px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500;
+    background: var(--input-bg);
+    border-color: var(--input-border);
+  }
+  textarea.input { @apply h-auto py-2; }
+  .input:hover { border-color: var(--input-border-hover); }
+  .input:focus { border-color: rgb(var(--c-accent)); box-shadow: var(--focus); }
+  .input:disabled { @apply cursor-not-allowed opacity-70; }
+  .label { @apply mb-1.5 block text-[13px] font-semibold text-slate-300; }
+  .btn {
+    @apply inline-flex h-[38px] items-center justify-center gap-2 whitespace-nowrap rounded-control border px-3.5 text-sm font-semibold transition active:scale-[.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn:focus-visible { outline: none; box-shadow: var(--focus); }
+  .btn-primary { @apply btn border-transparent text-white; background: var(--btn-primary-bg); box-shadow: var(--btn-primary-shadow); }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-ghost { @apply btn text-slate-200; background: var(--btn-secondary-bg); border-color: var(--btn-secondary-border); }
+  .btn-ghost:hover { background: var(--btn-secondary-hover); }
+  .btn-danger { @apply btn border-transparent bg-red-600 text-white hover:bg-red-700; }
+  .btn-sm { @apply h-[30px] px-2.5 text-[13px]; }
+  .chip { @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-slate-300 transition; background: var(--btn-secondary-bg); border-color: var(--btn-secondary-border); }
+  .chip:hover { border-color: var(--input-border-hover); }
+  .chip-on { @apply border-accent bg-accent-soft text-accent; }
   .table-nc { @apply w-full text-sm; }
-  .table-nc thead th { @apply sticky top-0 z-10 bg-base-900/95 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 backdrop-blur; }
-  .table-nc tbody td { @apply whitespace-nowrap border-t border-base-700/50 px-3 py-2.5 align-middle; }
-  .table-nc thead th { @apply whitespace-nowrap; }
-  .table-nc tbody tr { @apply transition-colors hover:bg-base-800/60; }
+  .table-nc thead th { @apply sticky top-0 z-10 whitespace-nowrap bg-base-850 px-3 py-2.5 text-left text-[12.5px] font-semibold text-slate-400; }
+  .table-nc tbody td { @apply whitespace-nowrap border-t border-base-700 px-3 py-2.5 align-middle; }
+  .table-nc tbody tr { @apply transition-colors hover:bg-base-850; }
   .mono { @apply font-mono text-[12px]; }
+  .pill { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold; }
 }
 
-.leaflet-container { background: #0b1120; font-family: inherit; }
-
-.osm-dark { filter: invert(1) hue-rotate(195deg) brightness(.85) contrast(.9) saturate(.6); }
-.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #131c31; color: #e2e8f0; border: 1px solid #243049; }
-.leaflet-control-attribution { background: rgba(11,17,32,.75) !important; color: #64748b !important; }
-.leaflet-control-attribution a { color: #93c5fd !important; }
-.leaflet-bar a, .leaflet-control-layers { background: #131c31 !important; color: #e2e8f0 !important; border-color: #243049 !important; }
+.leaflet-container { background: var(--map-bg); font-family: inherit; }
+[data-theme="dark"] .osm-dark { filter: invert(1) hue-rotate(195deg) brightness(.85) contrast(.9) saturate(.6); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: rgb(var(--c-surface)); color: rgb(var(--c-fg)); border: 1px solid rgb(var(--c-border)); }
+.leaflet-control-attribution { background: rgb(var(--c-surface) / .8) !important; color: rgb(var(--c-subtle)) !important; }
+.leaflet-control-attribution a { color: rgb(var(--c-accent)) !important; }
+.leaflet-bar a, .leaflet-control-layers { background: rgb(var(--c-surface)) !important; color: rgb(var(--c-fg)) !important; border-color: rgb(var(--c-border)) !important; }
 .qr svg { width: 100%; height: auto; background: #fff; border-radius: .75rem; padding: .5rem; }
+
+/* Switching the theme reveals the new one in a circle from the toggle (View Transitions), as in Umbrella. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }

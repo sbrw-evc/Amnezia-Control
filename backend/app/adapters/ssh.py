@@ -17,7 +17,7 @@ class SshKeyProvider:
         if not self._ready:
             data = await self._secrets.get(KEY_SECRET)
             if not data or "private_key" not in data:
-                raise ExternalServiceError("SSH-ключ не найден в OpenBao (infra/ssh)")
+                raise ExternalServiceError("SSH key not found in OpenBao (infra/ssh)")
             os.makedirs(os.path.dirname(self._path), mode=0o700, exist_ok=True)
             tmp = f"{self._path}.{os.getpid()}"
             fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -49,7 +49,7 @@ class SshRunner(CommandRunner):
                 proc.communicate(stdin.encode() if stdin is not None else None), timeout)
         except asyncio.TimeoutError:
             proc.kill()
-            raise ExternalServiceError(f"{self._host}: таймаут SSH")
+            raise ExternalServiceError(f"{self._host}: SSH timed out")
         if proc.returncode != 0:
             msg = (err or out).decode(errors="replace").strip()
             raise ExternalServiceError(f"{self._host}: {msg or 'ssh exit ' + str(proc.returncode)}")

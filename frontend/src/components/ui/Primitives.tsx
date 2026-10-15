@@ -2,6 +2,7 @@ import { animate, AnimatePresence, motion, useMotionValue, useTransform } from "
 import { X } from "lucide-react";
 import clsx from "clsx";
 import { useEffect, type ReactNode } from "react";
+import { locale, t } from "@/i18n";
 
 export function Page({ children }: { children: ReactNode }) {
   return (
@@ -12,14 +13,15 @@ export function Page({ children }: { children: ReactNode }) {
   );
 }
 
+/** Page title row of the Umbrella shell: a 22px title, a muted subtitle under it and the actions on the right. */
 export function PageHeader({ title, subtitle, actions, icon }: { title: string; subtitle?: ReactNode; actions?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div className="flex items-center gap-3">
-        {icon && <div className="rounded-xl border border-base-700 bg-base-850 p-2.5 text-accent">{icon}</div>}
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-white">{title}</h1>
-          {subtitle && <div className="mt-0.5 text-sm text-slate-400">{subtitle}</div>}
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        {icon && <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-accent-soft text-accent">{icon}</div>}
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-slate-100">{title}</h1>
+          {subtitle && <div className="mt-1 text-sm text-slate-400">{subtitle}</div>}
         </div>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -36,23 +38,24 @@ export function Card({ title, actions, children, className, bodyClass }: { title
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
       )}
-      <div className={clsx(bodyClass ?? "p-4")}>{children}</div>
+      <div className={clsx(bodyClass ?? "p-[18px]")}>{children}</div>
     </motion.section>
   );
 }
 
+/** Umbrella pills: a soft fill with coloured text, no border. */
 const TONES = {
-  green: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-  red: "border-red-500/30 bg-red-500/10 text-red-300",
-  amber: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-  blue: "border-blue-500/30 bg-blue-500/10 text-blue-300",
-  violet: "border-violet-500/30 bg-violet-500/10 text-violet-300",
-  slate: "border-base-600 bg-base-800 text-slate-300",
+  green: "bg-emerald-500/15 text-emerald-300",
+  red: "bg-red-500/15 text-red-300",
+  amber: "bg-amber-500/15 text-amber-300",
+  blue: "bg-blue-500/15 text-blue-300",
+  violet: "bg-violet-500/15 text-violet-300",
+  slate: "bg-base-800 text-slate-400",
 } as const;
 export type Tone = keyof typeof TONES;
 
 export function Badge({ tone = "slate", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
-  return <span className={clsx("inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium", TONES[tone], className)}>{children}</span>;
+  return <span className={clsx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold", TONES[tone], className)}>{children}</span>;
 }
 
 export function StatusDot({ on, warn, pulse = true }: { on: boolean; warn?: boolean; pulse?: boolean }) {
@@ -72,14 +75,14 @@ export function UsageBar({ percent, label, className }: { percent: number | null
     <div className={clsx("relative h-5 w-full min-w-[90px] overflow-hidden rounded bg-base-800", className)}>
       <motion.div className={clsx("h-full bg-gradient-to-r", color)} initial={{ width: 0 }} animate={{ width: `${p}%` }}
         transition={{ type: "spring", stiffness: 80, damping: 18 }} />
-      <span className="absolute inset-0 flex items-center px-2 text-[11px] font-semibold text-white drop-shadow">
+      <span className="absolute inset-0 flex items-center px-2 text-[11px] font-semibold text-fg">
         {percent === null ? "∞" : `${p.toFixed(0)}%`}{label && <span className="ml-1 font-normal text-slate-200/80">{label}</span>}
       </span>
     </div>
   );
 }
 
-export function AnimatedNumber({ value, format = (n) => Math.round(n).toLocaleString("ru-RU") }: { value: number; format?: (n: number) => string }) {
+export function AnimatedNumber({ value, format = (n) => Math.round(n).toLocaleString(locale()) }: { value: number; format?: (n: number) => string }) {
   const mv = useMotionValue(0);
   const text = useTransform(mv, (v) => format(v));
   useEffect(() => {
@@ -95,13 +98,12 @@ export function Kpi({ label, value, format, icon, hint, tone = "blue", delay = 0
   return (
     <motion.div initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay, type: "spring", stiffness: 260, damping: 24 }} whileHover={{ y: -2 }}
-      className="card relative overflow-hidden p-4">
-      <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent/10 blur-2xl" />
-      <div className="flex items-start justify-between">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
-        <div className={clsx("rounded-lg border p-1.5", TONES[tone])}>{icon}</div>
+      className="card relative overflow-hidden p-[18px]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[13px] font-semibold text-slate-400">{label}</div>
+        <div className={clsx("rounded-[9px] p-1.5", TONES[tone])}>{icon}</div>
       </div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums text-white"><AnimatedNumber value={value} format={format} /></div>
+      <div className="mt-2 text-[26px] font-semibold leading-tight tabular-nums text-fg"><AnimatedNumber value={value} format={format} /></div>
       {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
     </motion.div>
   );
@@ -109,11 +111,11 @@ export function Kpi({ label, value, format, icon, hint, tone = "blue", delay = 0
 
 export function Segmented<T extends string>({ value, options, onChange, layoutId }: { value: T; options: { value: T; label: ReactNode }[]; onChange: (v: T) => void; layoutId: string }) {
   return (
-    <div className="inline-flex rounded-lg border border-base-700 bg-base-950/60 p-0.5">
+    <div className="inline-flex rounded-[10px] p-[3px]" style={{ background: "var(--segment-bg)" }}>
       {options.map((o) => (
         <button type="button" key={o.value} onClick={() => onChange(o.value)}
-          className={clsx("relative rounded-md px-2.5 py-1 text-xs font-medium transition", value === o.value ? "text-white" : "text-slate-400 hover:text-slate-200")}>
-          {value === o.value && <motion.span layoutId={layoutId} className="absolute inset-0 rounded-md bg-accent/80"
+          className={clsx("relative rounded-[8px] px-3 py-1 text-[13px] font-semibold transition", value === o.value ? "text-slate-100" : "text-slate-500 hover:text-slate-200")}>
+          {value === o.value && <motion.span layoutId={layoutId} className="absolute inset-0 rounded-[8px] shadow-sm" style={{ background: "var(--segment-on)" }}
             transition={{ type: "spring", stiffness: 400, damping: 32 }} />}
           <span className="relative">{o.label}</span>
         </button>
@@ -132,15 +134,15 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
     <AnimatePresence>
       {open && (
         <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+          <div className="absolute inset-0 backdrop-blur-[3px]" style={{ background: "var(--backdrop)" }} onClick={onClose} />
           <motion.div role="dialog" initial={{ opacity: 0, scale: 0.94, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }} transition={{ type: "spring", stiffness: 340, damping: 28 }}
             className={clsx("card relative max-h-[90vh] w-full overflow-auto shadow-2xl", wide ? "max-w-3xl" : "max-w-lg")}>
-            <div className="card-head sticky top-0 z-10 bg-base-900/95">
-              <h3 className="text-base font-semibold text-white">{title}</h3>
-              <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-base-800 hover:text-white"><X size={18} /></button>
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-base-900 px-5 pb-2 pt-4">
+              <h3 className="text-[17px] font-semibold text-fg">{title}</h3>
+              <button onClick={onClose} aria-label={t("Close")} className="rounded-control p-1.5 text-slate-400 hover:bg-base-850 hover:text-fg"><X size={18} /></button>
             </div>
-            <div className="p-5">{children}</div>
+            <div className="px-5 pb-5 pt-2">{children}</div>
           </motion.div>
         </motion.div>
       )}
@@ -153,7 +155,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
     <div className="block" role="group" aria-label={label}>
       <span className="label">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-[11px] text-slate-500">{hint}</span>}
+      {hint && <span className="mt-1 block text-[12px] text-slate-500">{hint}</span>}
     </div>
   );
 }

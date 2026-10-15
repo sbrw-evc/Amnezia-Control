@@ -26,7 +26,7 @@ def free_address(network: ipaddress.IPv4Network, taken: list[str]) -> str:
     for ip in network.hosts():
         if ip not in used:
             return f"{ip}/32"
-    raise DomainError(f"Нет свободных адресов в {network}")
+    raise DomainError(f"No free addresses in {network}")
 
 
 def generate_psk() -> str:

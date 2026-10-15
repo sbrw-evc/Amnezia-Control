@@ -105,9 +105,9 @@ class SnmpClient:
         err, status, _, binds = await get_cmd(self._engine, self._auth, await self._t(), ContextData(),
                                               *(ObjectType(ObjectIdentity(o)) for o in oids))
         if err:
-            raise ExternalServiceError(f"{self.host}: SNMP — {err}")
+            raise ExternalServiceError(f"{self.host}: SNMP: {err}")
         if status:
-            raise ExternalServiceError(f"{self.host}: SNMP — {status.prettyPrint()}")
+            raise ExternalServiceError(f"{self.host}: SNMP: {status.prettyPrint()}")
         return {str(b[0]): b[1] for b in binds if b[1].__class__.__name__ not in ("NoSuchObject", "NoSuchInstance")}
 
     async def walk(self, oid: str, limit: int = 20000) -> dict[str, object]:
@@ -119,7 +119,7 @@ class SnmpClient:
             if err:
                 if out:
                     break
-                raise ExternalServiceError(f"{self.host}: SNMP — {err}")
+                raise ExternalServiceError(f"{self.host}: SNMP: {err}")
             if status:
                 break
             for name, value in binds:
@@ -135,8 +135,8 @@ class SnmpClient:
         err, status, _, _ = await set_cmd(self._engine, self._auth, await self._t(), ContextData(),
                                           ObjectType(ObjectIdentity(oid), value))
         if err or status:
-            raise ExternalServiceError(f"{self.host}: SNMP SET — {err or status.prettyPrint()} "
-                                       "(нужно сообщество / пользователь с правом записи)")
+            raise ExternalServiceError(f"{self.host}: SNMP SET: {err or status.prettyPrint()} "
+                                       "(a community / user with write access is required)")
 
     def close(self) -> None:
         try:
@@ -221,17 +221,17 @@ class SnmpDriver(DeviceDriver):
     async def apply(self, action: str, p: dict) -> str:
         if action == "hostname":
             await self.snmp.set(OIDS["sysName"], OctetString(p["name"]))
-            return "Готово"
+            return "Done"
         if action == "interface" and p.get("enabled") is not None:
             names = {_str(v): k for k, v in (await self.snmp.walk(IF["name"])).items()} or \
                 {_str(v): k for k, v in (await self.snmp.walk(IF["descr"])).items()}
             idx = names.get(p["name"])
             if not idx:
-                raise ExternalServiceError(f"Интерфейс {p['name']} не найден")
+                raise ExternalServiceError(f"Interface {p['name']} not found")
             await self.snmp.set(f"{IF['admin']}.{idx}", Integer(1 if p["enabled"] else 2))
             if p.get("description") is not None:
                 await self.snmp.set(f"{IF['alias']}.{idx}", OctetString(p["description"]))
-            return "Готово"
+            return "Done"
         raise UnsupportedAction(self.vendor or "SNMP", action)
 
     async def close(self) -> None:

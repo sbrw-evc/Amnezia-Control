@@ -119,7 +119,7 @@ async def scan(target: str, community: str = "public", limit: int = 1024) -> lis
     """Probes every address of a subnet (at most /22) and returns those that answered."""
     net = ipaddress.ip_network(target, strict=False)
     if net.num_addresses > limit:
-        raise ValueError(f"Слишком большая сеть: не больше {limit} адресов")
+        raise ValueError(f"The network is too large: no more than {limit} addresses")
     hosts = [str(h) for h in (net.hosts() if net.num_addresses > 1 else [net.network_address])]
     sem = asyncio.Semaphore(48)
 

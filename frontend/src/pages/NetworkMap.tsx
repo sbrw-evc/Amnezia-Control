@@ -5,7 +5,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Crosshair, ExternalLink, Lock, Network, Plus, RefreshCw, Search, Unlock, Waypoints, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { k, t, useLang } from "@/i18n";
 import { api } from "@/lib/api";
+import { chartColors, useTheme } from "@/lib/theme";
 import { Fmt } from "@/lib/format";
 import { useAction } from "@/lib/hooks";
 import { useLive } from "@/lib/live";
@@ -18,15 +20,15 @@ import { ErrorState, Skeleton } from "@/components/ui/Feedback";
 import DeviceForm, { type DevicePrefill } from "@/components/devices/DeviceForm";
 
 const CATEGORIES = [
-  { name: "Интернет и VPN", color: "#a78bfa" }, { name: "Маршрутизаторы и МСЭ", color: "#3b82f6" },
-  { name: "Коммутаторы", color: "#22d3ee" }, { name: "Точки доступа и контроллеры", color: "#34d399" },
-  { name: "Серверы и прочее", color: "#f59e0b" }, { name: "Обнаруженные соседи", color: "#64748b" },
-  { name: "Клиенты онлайн", color: "#93c5fd" }, { name: "Клиенты офлайн", color: "#475569" },
+  { name: k("Internet and VPN"), color: "#a78bfa" }, { name: k("Routers and firewalls"), color: "#3b82f6" },
+  { name: k("Switches"), color: "#22d3ee" }, { name: k("Access points and controllers"), color: "#34d399" },
+  { name: k("Servers and other"), color: "#f59e0b" }, { name: k("Discovered neighbours"), color: "#64748b" },
+  { name: k("Clients online"), color: "#93c5fd" }, { name: k("Clients offline"), color: "#475569" },
 ];
 const EDGE: Record<TopoEdge["kind"], { color: string; type: "solid" | "dashed" | "dotted"; label: string }> = {
-  link: { color: "#3b82f6", type: "solid", label: "канал между устройствами" }, managed: { color: "#64748b", type: "dotted", label: "управляется контроллером" },
-  wifi: { color: "#34d399", type: "dashed", label: "Wi-Fi" }, wired: { color: "#475569", type: "solid", label: "проводное подключение" },
-  wan: { color: "#a78bfa", type: "solid", label: "выход в интернет" }, tunnel: { color: "#f472b6", type: "dashed", label: "VPN-туннель" },
+  link: { color: "#3b82f6", type: "solid", label: k("link between devices") }, managed: { color: "#64748b", type: "dotted", label: k("managed by a controller") },
+  wifi: { color: "#34d399", type: "dashed", label: "Wi-Fi" }, wired: { color: "#475569", type: "solid", label: k("wired connection") },
+  wan: { color: "#a78bfa", type: "solid", label: k("internet uplink") }, tunnel: { color: "#f472b6", type: "dashed", label: k("VPN tunnel") },
 };
 const SYMBOL: Record<string, string> = { internet: "roundRect", vpn: "diamond", router: "roundRect", firewall: "roundRect", gateway: "roundRect",
   switch: "rect", ap: "triangle", controller: "pin", server: "rect", other: "circle" };
@@ -61,19 +63,19 @@ function Details({ node, edges, nodes, onClose, onAdd }: { node: TopoNode; edges
     <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }} className="card absolute right-3 top-3 z-10 w-80 max-w-[calc(100%-24px)] p-4 shadow-2xl">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <div className="truncate font-semibold text-white">{node.label}</div>
-          <div className="text-xs text-slate-500">{node.type === "endpoint" ? (node.vendor || "клиент") : ROLE_LABEL[node.role ?? ""] ?? node.type}{node.model ? ` · ${node.model}` : ""}</div>
+          <div className="truncate font-semibold text-fg">{node.label}</div>
+          <div className="text-xs text-slate-500">{node.type === "endpoint" ? (node.vendor || t("client")) : ROLE_LABEL[node.role ?? ""] ? t(ROLE_LABEL[node.role ?? ""]) : node.type}{node.model ? ` · ${node.model}` : ""}</div>
         </div>
-        <button className="p-1 text-slate-500 hover:text-white" onClick={onClose}><X size={16} /></button>
+        <button className="p-1 text-slate-500 hover:text-fg" onClick={onClose}><X size={16} /></button>
       </div>
       <div className="mt-3 space-y-1 text-sm">
-        {st && <div><Badge tone={st.tone}>{st.label}</Badge></div>}
-        {node.type === "endpoint" && <div className="flex items-center gap-2"><StatusDot on={node.status === "online"} pulse={false} /> {node.status === "online" ? "онлайн" : `был ${Fmt.ago(node.last_seen)}`}{node.blocked && <Badge tone="red">заблокирован</Badge>}</div>}
+        {st && <div><Badge tone={st.tone}>{t(st.label)}</Badge></div>}
+        {node.type === "endpoint" && <div className="flex items-center gap-2"><StatusDot on={node.status === "online"} pulse={false} /> {node.status === "online" ? t("online now") : t("seen {ago}", { ago: Fmt.ago(node.last_seen) })}{node.blocked && <Badge tone="red">{t("is blocked")}</Badge>}</div>}
         {node.ip && <div className="flex justify-between"><span className="text-slate-500">IP</span><span className="mono">{node.ip}</span></div>}
         {node.mac && <div className="flex justify-between"><span className="text-slate-500">MAC</span><span className="mono">{node.mac}</span></div>}
         {node.ssid && <div className="flex justify-between"><span className="text-slate-500">Wi-Fi</span><span>{node.ssid}{node.signal != null ? ` · ${node.signal} dBm` : ""}</span></div>}
-        {!!node.clients && <div className="flex justify-between"><span className="text-slate-500">Клиентов</span><span>{node.clients}</span></div>}
-        {!!node.bps && <div className="flex justify-between"><span className="text-slate-500">Трафик (5 мин)</span><span className="mono">{bps(node.bps)}</span></div>}
+        {!!node.clients && <div className="flex justify-between"><span className="text-slate-500">{t("Client count")}</span><span>{node.clients}</span></div>}
+        {!!node.bps && <div className="flex justify-between"><span className="text-slate-500">{t("Traffic (5 min)")}</span><span className="mono">{bps(node.bps)}</span></div>}
         {node.error && <div className="text-xs text-amber-300">{node.error}</div>}
       </div>
       {!!links.length && (
@@ -93,9 +95,9 @@ function Details({ node, edges, nodes, onClose, onAdd }: { node: TopoNode; edges
         </div>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
-        {node.device_id && <Link className="btn-ghost btn-sm" to={`/devices/${node.device_id}`}><ExternalLink size={12} /> Устройство</Link>}
-        {flowsLink && <Link className="btn-ghost btn-sm" to={flowsLink}><Waypoints size={12} /> Трафик</Link>}
-        {node.type === "neighbor" && isAdmin && <button className="btn-primary btn-sm" onClick={() => onAdd({ host: node.ip, name: node.label, platform: node.platform_guess || "snmp" })}><Plus size={12} /> Добавить в систему</button>}
+        {node.device_id && <Link className="btn-ghost btn-sm" to={`/devices/${node.device_id}`}><ExternalLink size={12} /> {t("Device")}</Link>}
+        {flowsLink && <Link className="btn-ghost btn-sm" to={flowsLink}><Waypoints size={12} /> {t("Traffic")}</Link>}
+        {node.type === "neighbor" && isAdmin && <button className="btn-primary btn-sm" onClick={() => onAdd({ host: node.ip, name: node.label, platform: node.platform_guess || "snmp" })}><Plus size={12} /> {t("Add to the system")}</button>}
       </div>
     </motion.div>
   );
@@ -115,6 +117,8 @@ export default function NetworkMap() {
   const positions = useRef(new Map<string, [number, number]>());
   const topo = useQuery({ queryKey: ["topology", offline, showEndpoints], queryFn: () => api.devices.topology(offline, showEndpoints), refetchInterval: 20_000 });
   useLive("devices", () => topo.refetch(), []);
+  const theme = useTheme();
+  const lang = useLang();
   const savePos = useAction((p: Record<string, [number, number] | null>) => api.devices.savePositions(p));
 
   const data = topo.data;
@@ -134,6 +138,7 @@ export default function NetworkMap() {
   const option = useMemo(() => {
     if (!data) return null;
     remember();
+    const c = chartColors();
     const small = data.nodes.length < 60;
     const nodes = data.nodes.map((n) => {
       const cat = category(n);
@@ -146,9 +151,9 @@ export default function NetworkMap() {
         symbolSize: nodeSize(n), value: n.bps ?? 0, draggable: true,
         ...(pinned ? { x: n.x, y: n.y, fixed: true } : known ? { x: known[0], y: known[1] } : {}),
         ...(frozen && known ? { fixed: true } : {}),
-        itemStyle: { borderColor: down ? "#ef4444" : hit ? "#facc15" : n.type === "neighbor" ? "#94a3b8" : "#0b1120", borderWidth: down || hit ? 3 : 1.5,
+        itemStyle: { borderColor: down ? "#ef4444" : hit ? "#facc15" : n.type === "neighbor" ? c.text : c.surface, borderWidth: down || hit ? 3 : 1.5,
           borderType: n.type === "neighbor" ? "dashed" : "solid", opacity: match && !hit ? 0.25 : 1, shadowBlur: hit ? 18 : 0, shadowColor: "#facc15" },
-        label: { show: labels && (n.type !== "endpoint" || small || !!hit || (n.bps ?? 0) > 1e6), position: "bottom", color: "#cbd5e1", fontSize: n.type === "endpoint" ? 10 : 11,
+        label: { show: labels && (n.type !== "endpoint" || small || !!hit || (n.bps ?? 0) > 1e6), position: "bottom", color: c.fg, fontSize: n.type === "endpoint" ? 10 : 11,
           formatter: n.type === "device" || n.type === "child" ? `${n.label}${n.clients ? ` (${n.clients})` : ""}` : n.label },
       };
     });
@@ -162,29 +167,29 @@ export default function NetworkMap() {
         lineStyle: { color: util != null && util > 80 ? "#ef4444" : util != null && util > 50 ? "#f59e0b" : s.color, type: s.type, width: w,
           opacity: match ? 0.25 : e.kind === "wired" || e.kind === "wifi" ? 0.55 : 0.85, curveness: e.kind === "tunnel" ? 0.25 : 0 },
         label: { show: labels && e.kind === "link" && !!(e.source_port || e.bps), formatter: [e.source_port, e.bps ? bps(e.bps) : ""].filter(Boolean).join(" · "),
-          color: "#64748b", fontSize: 9 },
+          color: c.text, fontSize: 9 },
         tip: e,
       };
     });
     return {
       backgroundColor: "transparent",
       tooltip: {
-        backgroundColor: "#131c31", borderColor: "#243049", textStyle: { color: "#e2e8f0", fontSize: 12 },
+        backgroundColor: c.surface, borderColor: c.border, textStyle: { color: c.fg, fontSize: 12 },
         formatter: (p: { dataType: string; data: { id?: string; tip?: TopoEdge } }) => {
           if (p.dataType === "edge" && p.data.tip) {
             const e = p.data.tip;
-            return `${byId.get(e.source)?.label ?? ""} ${e.source_port ? `(${e.source_port})` : ""} — ${byId.get(e.target)?.label ?? ""} ${e.target_port ? `(${e.target_port})` : ""}<br/>${EDGE[e.kind].label}${e.protocol ? ` · ${e.protocol.toUpperCase()}` : ""}${e.bps ? `<br/>${bps(e.bps)}` : ""}${e.utilization != null ? ` · ${e.utilization}%` : ""}`;
+            return `${byId.get(e.source)?.label ?? ""} ${e.source_port ? `(${e.source_port})` : ""} — ${byId.get(e.target)?.label ?? ""} ${e.target_port ? `(${e.target_port})` : ""}<br/>${t(EDGE[e.kind].label)}${e.protocol ? ` · ${e.protocol.toUpperCase()}` : ""}${e.bps ? `<br/>${bps(e.bps)}` : ""}${e.utilization != null ? ` · ${e.utilization}%` : ""}`;
           }
           const n = byId.get(p.data.id ?? "");
           if (!n) return "";
           return `<b>${n.label}</b>${n.ip ? `<br/>${n.ip}` : ""}${n.vendor ? `<br/>${n.vendor}` : ""}${n.bps ? `<br/>${bps(n.bps)}` : ""}`;
         },
       },
-      legend: { data: CATEGORIES.map((c) => c.name), bottom: 4, textStyle: { color: "#94a3b8", fontSize: 11 }, itemWidth: 12, itemHeight: 10 },
+      legend: { data: CATEGORIES.map((x) => t(x.name)), bottom: 4, textStyle: { color: c.text, fontSize: 11 }, itemWidth: 12, itemHeight: 10 },
       animationDurationUpdate: 600,
       series: [{
         type: "graph", layout: "force", roam: true, draggable: true, scaleLimit: { min: 0.2, max: 6 },
-        categories: CATEGORIES.map((c) => ({ name: c.name, itemStyle: { color: c.color } })),
+        categories: CATEGORIES.map((x) => ({ name: t(x.name), itemStyle: { color: x.color } })),
         zoom: small ? 1.6 : 1,
         force: { repulsion: small ? [160, 520] : [60, 420], edgeLength: small ? [50, 150] : [30, 140], gravity: small ? 0.1 : 0.06,
           friction: 0.15, layoutAnimation: !frozen },
@@ -192,7 +197,7 @@ export default function NetworkMap() {
         data: nodes, links, edgeSymbol: ["none", "none"],
       }],
     };
-  }, [data, labels, frozen, match, byId, remember]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, labels, frozen, match, byId, remember, theme, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { remember(); }, [remember]);
 
@@ -219,28 +224,28 @@ export default function NetworkMap() {
 
   return (
     <Page>
-      <PageHeader title="Карта сети" icon={<Network size={20} />}
-        subtitle="Строится по данным устройств: LLDP / CDP / MNDP, контроллеры, порты коммутаторов, Wi-Fi и трафик клиентов"
-        actions={<button className="btn-ghost" onClick={() => topo.refetch()}><RefreshCw size={14} className={topo.isFetching ? "animate-spin" : ""} /> Обновить</button>} />
+      <PageHeader title={t("Network map")} icon={<Network size={20} />}
+        subtitle={t("Built from device data: LLDP / CDP / MNDP, controllers, switch ports, Wi-Fi and client traffic")}
+        actions={<button className="btn-ghost" onClick={() => topo.refetch()}><RefreshCw size={14} className={topo.isFetching ? "animate-spin" : ""} /> {t("Refresh")}</button>} />
       <div className="card flex flex-wrap items-center gap-4 p-3 text-sm">
         <div className="relative min-w-[200px] flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input className="input pl-9" placeholder="Найти на карте: имя, IP, MAC, производитель…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input pl-9" placeholder={t("Find on the map: name, IP, MAC, vendor…")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <Checkbox checked={showEndpoints} onChange={setShowEndpoints} label="Клиенты" />
-        <Checkbox checked={offline} onChange={setOffline} label="Офлайн-клиенты" />
-        <Checkbox checked={labels} onChange={setLabels} label="Подписи" />
-        <button className="btn-ghost btn-sm" onClick={() => { remember(); setFrozen((f) => !f); }} title="Зафиксировать раскладку">
-          {frozen ? <Lock size={13} /> : <Unlock size={13} />} {frozen ? "Раскладка зафиксирована" : "Свободная раскладка"}</button>
-        {canMove && <button className="btn-ghost btn-sm" onClick={unpinAll} title="Сбросить закреплённые позиции устройств"><Crosshair size={13} /> Сбросить позиции</button>}
+        <Checkbox checked={showEndpoints} onChange={setShowEndpoints} label={t("Clients")} />
+        <Checkbox checked={offline} onChange={setOffline} label={t("Offline clients")} />
+        <Checkbox checked={labels} onChange={setLabels} label={t("Labels")} />
+        <button className="btn-ghost btn-sm" onClick={() => { remember(); setFrozen((f) => !f); }} title={t("Freeze the layout")}>
+          {frozen ? <Lock size={13} /> : <Unlock size={13} />} {frozen ? t("Layout frozen") : t("Free layout")}</button>
+        {canMove && <button className="btn-ghost btn-sm" onClick={unpinAll} title={t("Reset the pinned device positions")}><Crosshair size={13} /> {t("Reset positions")}</button>}
       </div>
       {s && (
         <div className="flex flex-wrap gap-2 text-xs">
-          <Badge tone="blue">устройств {s.devices}</Badge>{!!s.children && <Badge tone="green">через контроллеры {s.children}</Badge>}
-          {!!s.neighbors && <Badge>обнаружено соседей {s.neighbors}</Badge>}<Badge tone="violet">клиентов {s.endpoints} · онлайн {s.online}</Badge>
-          {!!s.down && <Badge tone="red">недоступно {s.down}</Badge>}
-          <Badge tone={s.traffic ? "green" : "slate"}>{s.traffic ? "трафик из NetFlow учтён" : "без данных о трафике"}</Badge>
-          <span className="ml-auto text-slate-500">обновлено {Fmt.ago(data?.generated_at)} · двойной клик — открыть устройство, перетащите устройство, чтобы закрепить</span>
+          <Badge tone="blue">{t("devices {n}", { n: s.devices })}</Badge>{!!s.children && <Badge tone="green">{t("via controllers {n}", { n: s.children })}</Badge>}
+          {!!s.neighbors && <Badge>{t("neighbours discovered {n}", { n: s.neighbors })}</Badge>}<Badge tone="violet">{t("clients {n} · online {online}", { n: s.endpoints, online: s.online })}</Badge>
+          {!!s.down && <Badge tone="red">{t("unreachable {n}", { n: s.down })}</Badge>}
+          <Badge tone={s.traffic ? "green" : "slate"}>{s.traffic ? t("NetFlow traffic included") : t("no traffic data")}</Badge>
+          <span className="ml-auto text-slate-500">{t("updated {ago} · double-click to open a device, drag a device to pin it", { ago: Fmt.ago(data?.generated_at) })}</span>
         </div>
       )}
       {topo.error && <ErrorState error={topo.error} />}
@@ -253,14 +258,14 @@ export default function NetworkMap() {
         {data && data.nodes.length <= 2 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-sm text-slate-400">
             <Network size={28} className="text-slate-600" />
-            Добавьте сетевые устройства — карта построится из их соседей, портов и клиентов.
-            <Link className="btn-primary btn-sm mt-2" to="/devices"><Plus size={12} /> К устройствам</Link>
+            {t("Add network devices — the map is built from their neighbours, ports and clients.")}
+            <Link className="btn-primary btn-sm mt-2" to="/devices"><Plus size={12} /> {t("Go to devices")}</Link>
           </div>
         )}
       </Card>
       <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-        {Object.values(EDGE).map((e) => <span key={e.label} className="flex items-center gap-1.5"><span className="inline-block w-6 border-t-2" style={{ borderColor: e.color, borderStyle: e.type }} /> {e.label}</span>)}
-        <span className="flex items-center gap-1.5"><span className="inline-block w-6 border-t-2 border-red-500" /> загрузка канала &gt; 80%</span>
+        {Object.values(EDGE).map((e) => <span key={e.label} className="flex items-center gap-1.5"><span className="inline-block w-6 border-t-2" style={{ borderColor: e.color, borderStyle: e.type }} /> {t(e.label)}</span>)}
+        <span className="flex items-center gap-1.5"><span className="inline-block w-6 border-t-2 border-red-500" /> {t("link utilization > 80%")}</span>
       </div>
       <DeviceForm open={!!adding} prefill={adding ?? undefined} onClose={() => setAdding(null)} />
     </Page>

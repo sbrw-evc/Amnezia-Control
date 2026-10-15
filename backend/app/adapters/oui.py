@@ -94,5 +94,5 @@ class OuiDatabase:
             return ""
         v = self._map.get(mac[:8].lower(), "")
         if not v and is_random(mac):
-            return "Случайный MAC"
+            return "Random MAC"
         return v

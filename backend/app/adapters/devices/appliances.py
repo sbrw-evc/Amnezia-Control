@@ -47,7 +47,7 @@ class HttpApiDriver(DeviceDriver):
         except ValueError as e:
             if optional:
                 return None
-            raise ExternalServiceError(f"{self.target.host}: ответ API не JSON") from e
+            raise ExternalServiceError(f"{self.target.host}: the API response is not JSON") from e
 
     async def _send(self, method: str, path: str, body=None, timeout: float = 30):
         try:
@@ -118,7 +118,7 @@ class OpnsenseDriver(HttpApiDriver):
     async def apply(self, action: str, p: dict) -> str:
         if action == "reboot":
             await self._send("POST", "/api/core/system/reboot", {})
-            return "Перезагрузка запущена"
+            return "Reboot started"
         if action == "flow_export":
             if p["protocol"] == "sflow":
                 raise UnsupportedAction("OPNsense", "flow_export (sflow)")
@@ -129,7 +129,7 @@ class OpnsenseDriver(HttpApiDriver):
                 "interfaces": ifaces if p["enabled"] else "", "egress_only": "", "version": version,
                 "targets": f"{p['collector']}:{p['port']}" if p["enabled"] else ""}}})
             await self._send("POST", "/api/diagnostics/netflow/reconfigure", {})
-            return f"NetFlow {'включён' if p['enabled'] else 'выключен'} на интерфейсах {ifaces}"
+            return f"NetFlow {'enabled' if p['enabled'] else 'disabled'} on interfaces {ifaces}"
         raise UnsupportedAction("OPNsense", action)
 
     async def backup(self) -> str:
@@ -195,13 +195,13 @@ class PfsenseDriver(HttpApiDriver):
                 await self._send("POST", "/api/v2/diagnostics/reboot", {}, timeout=10)
             except ExternalServiceError:
                 pass
-            return "Перезагрузка запущена"
+            return "Reboot started"
         elif action == "command":
             r = await self._send("POST", "/api/v2/diagnostics/command_prompt", {"command": p["command"]}, timeout=120)
             return str(((r or {}).get("data") or {}).get("output", "")) if isinstance(r, dict) else str(r)
         else:
             raise UnsupportedAction("pfSense", action)
-        return "Готово"
+        return "Done"
 
     async def backup(self) -> str:
         return await self.apply("command", {"command": "cat /cf/conf/config.xml"})
@@ -277,16 +277,16 @@ class FortigateDriver(HttpApiDriver):
                                                                    "collector-port": p["port"]}]})
                 except ExternalServiceError:
                     await self._send("PUT", path, {"collector-ip": p["collector"], "collector-port": p["port"]})
-            return "Коллектор задан; включите netflow-sampler / sflow-sampler на нужных интерфейсах"
+            return "Collector set; enable netflow-sampler / sflow-sampler on the interfaces you need"
         elif action == "reboot":
             try:
                 await self._send("POST", "/api/v2/monitor/system/os/reboot", {"event_log_message": "Network Control"})
             except ExternalServiceError:
                 pass
-            return "Перезагрузка запущена"
+            return "Reboot started"
         else:
             raise UnsupportedAction("FortiGate", action)
-        return "Готово"
+        return "Done"
 
     async def backup(self) -> str:
         try:
@@ -310,12 +310,12 @@ class KeeneticDriver(HttpApiDriver):
             return
         realm, challenge = r.headers.get("X-NDM-Realm", ""), r.headers.get("X-NDM-Challenge", "")
         if not challenge:
-            raise ExternalServiceError(f"{self.target.host}: это не веб-интерфейс Keenetic")
+            raise ExternalServiceError(f"{self.target.host}: this is not a Keenetic web interface")
         md5 = hashlib.md5(f"{self.creds.username}:{realm}:{self.creds.password}".encode()).hexdigest()
         sha = hashlib.sha256((challenge + md5).encode()).hexdigest()
         r = await self.http.post("/auth", json={"login": self.creds.username, "password": sha})
         if r.status_code != 200:
-            raise ExternalServiceError(f"{self.target.host}: Keenetic — неверный логин или пароль")
+            raise ExternalServiceError(f"{self.target.host}: Keenetic: wrong login or password")
 
     async def _rci(self, path: str, optional: bool = False):
         try:
@@ -388,7 +388,7 @@ class KeeneticDriver(HttpApiDriver):
                 await self._parse("system reboot")
             except (ExternalServiceError, httpx.HTTPError):
                 pass
-            return "Перезагрузка запущена"
+            return "Reboot started"
         elif action == "endpoint_block":
             cmds = [f"ip hotspot host {p['mac']} {'deny' if p['blocked'] else 'permit'}"]
         elif action == "command":
@@ -396,7 +396,7 @@ class KeeneticDriver(HttpApiDriver):
         else:
             raise UnsupportedAction("Keenetic", action)
         await self._parse(*cmds, "system configuration save")
-        return "Готово"
+        return "Done"
 
     async def backup(self) -> str:
         out = await self._parse("show running-config")
@@ -521,12 +521,12 @@ class LinuxDriver(DeviceDriver):
                 await self.run("(sleep 1; reboot) >/dev/null 2>&1 &", timeout=10)
             except ExternalServiceError:
                 pass
-            return "Перезагрузка запущена"
+            return "Reboot started"
         elif action == "command":
             return await self.run(p["command"], timeout=120)
         else:
             raise UnsupportedAction(self.os_name, action)
-        return "Готово"
+        return "Done"
 
     async def close(self) -> None:
         await self._ssh.close()
@@ -582,13 +582,13 @@ class OpenWrtDriver(LinuxDriver):
                 "uci set softflowd.@softflowd[0].interface=\"$(uci -q get network.lan.device || echo br-lan)\"; "
                 "uci commit softflowd && /etc/init.d/softflowd enable && /etc/init.d/softflowd restart")
             if "NOPKG" in out:
-                raise ExternalServiceError("На OpenWrt нет softflowd: выполните «opkg update && opkg install softflowd»")
-            return f"softflowd {'включён' if p['enabled'] else 'выключен'}: {p['collector']}:{p['port']}"
+                raise ExternalServiceError("softflowd is not installed on OpenWrt: run 'opkg update && opkg install softflowd'")
+            return f"softflowd {'enabled' if p['enabled'] else 'disabled'}: {p['collector']}:{p['port']}"
         elif action == "backup":
             return await self.backup()
         else:
             return await super().apply(action, p)
-        return "Готово"
+        return "Done"
 
     async def backup(self) -> str:
         return await self.run("uci export")

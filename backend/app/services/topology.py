@@ -188,7 +188,7 @@ class TopologyService:
                 add_edge(parent, infra, "wired", source_port=port)
 
         # internet, VPN
-        nodes["internet"] = {"id": "internet", "type": "internet", "label": "Интернет", "status": "up"}
+        nodes["internet"] = {"id": "internet", "type": "internet", "label": "Internet", "status": "up"}
         edge_routers = [nid for nid, n in nodes.items()
                         if n.get("type") in ("device", "child") and n.get("role") in ("router", "firewall", "gateway")]
         for nid in edge_routers:
@@ -198,7 +198,7 @@ class TopologyService:
             if first:
                 add_edge("internet", first, "wan")
         if self._ctx.get("vpn_host"):
-            nodes["vpn"] = {"id": "vpn", "type": "vpn", "label": "VPN-сервер AmneziaWG", "ip": self._ctx["vpn_host"],
+            nodes["vpn"] = {"id": "vpn", "type": "vpn", "label": "AmneziaWG VPN server", "ip": self._ctx["vpn_host"],
                             "status": "up"}
             add_edge("internet", "vpn", "wan")
             router = by_ip.get(self._ctx.get("router_host") or "") or (edge_routers[0] if edge_routers else None)

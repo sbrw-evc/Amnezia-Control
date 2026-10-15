@@ -226,7 +226,7 @@ class CliDriver(DeviceDriver):
                 await self._session(list(self.p.save) + list(self.p.reboot), timeout=30, answers=self.p.answers)
             except ExternalServiceError:
                 pass  # the device closes the session while rebooting
-            return "Перезагрузка запущена"
+            return "Reboot started"
         tpl = self.p.templates.get(action)
         if not tpl:
             raise UnsupportedAction(self.vendor or self.p.vendor, action)
@@ -239,7 +239,7 @@ class CliDriver(DeviceDriver):
         errors = [o.strip().splitlines()[0] for o in outs if ERROR.search(o)]
         if errors:
             raise ExternalServiceError(f"{self.target.host}: {errors[0]}")
-        return "Готово"
+        return "Done"
 
     async def backup(self) -> str:
         return (await self._session([self.p.running], timeout=120))[0]
@@ -339,7 +339,7 @@ class JunosDriver(DeviceDriver):
         text = "\n".join(out)
         if re.search(r"error:|syntax error|unknown command", text, re.I):
             raise ExternalServiceError(f"Junos: {text.strip().splitlines()[-1]}")
-        return "Готово"
+        return "Done"
 
     async def apply(self, action: str, p: dict) -> str:
         if action == "hostname":
@@ -360,7 +360,7 @@ class JunosDriver(DeviceDriver):
                 await self._ssh.shell(["request system reboot"], answers={r"\[yes,no\].*$": "yes"}, timeout=20)
             except ExternalServiceError:
                 pass
-            return "Перезагрузка запущена"
+            return "Reboot started"
         if action == "command":
             return await self._ssh.run(f"{p['command']} | no-more", timeout=120)
         raise UnsupportedAction("Juniper", action)
