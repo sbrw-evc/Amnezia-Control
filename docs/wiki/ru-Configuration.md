@@ -20,6 +20,7 @@
 | `MT_WG_IFACE` | `wg-nc` | Интерфейс WireGuard на MikroTik (см. [[VPN на MikroTik|ru-MikroTik-VPN]]) |
 | `MT_WG_NETWORK` | `10.9.0.0/24` | Сеть клиентов VPN на MikroTik; первый адрес — роутер |
 | `MT_WG_PORT` | `51820` | UDP-порт WireGuard-сервера MikroTik |
+| `PORT_FORWARDS` | — | TCP-порты шлюза, пробрасываемые в туннель: `локальный=ip:порт` через пробел, например `3128=10.8.1.0:3128` для прокси GitHub (см. [[Диагностика|ru-Troubleshooting]]) |
 | `SSH_KEY_FILE` | `/root/.ssh/id_ed25519` | SSH-ключ, импортируемый в OpenBao при первом запуске |
 | `PUBLIC_BASE_URL` | `http://localhost:8080` | Адрес панели (ссылки для выдачи конфигов) |
 | `PANEL_PORT` | `8080` | Порт панели |

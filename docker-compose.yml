@@ -12,6 +12,7 @@ services:
     environment:
       LAN_IF: ${LAN_IF:-eth0}
       TUNNEL_NET: ${TUNNEL_NET:-10.8.1.0/24}
+      PORT_FORWARDS: ${PORT_FORWARDS:-}
     restart: unless-stopped
 
   postgres:

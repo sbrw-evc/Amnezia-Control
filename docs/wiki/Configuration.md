@@ -20,6 +20,7 @@
 | `MT_WG_IFACE` | `wg-nc` | WireGuard interface on MikroTik (see [[MikroTik-VPN]]) |
 | `MT_WG_NETWORK` | `10.9.0.0/24` | Network of MikroTik VPN clients; the first address belongs to the router |
 | `MT_WG_PORT` | `51820` | UDP port of the MikroTik WireGuard server |
+| `PORT_FORWARDS` | — | TCP ports of the gateway forwarded into the tunnel, `local=ip:port` separated by spaces, e.g. `3128=10.8.1.0:3128` for the GitHub proxy (see [[Troubleshooting]]) |
 | `SSH_KEY_FILE` | `/root/.ssh/id_ed25519` | SSH key imported into OpenBao on first start |
 | `PUBLIC_BASE_URL` | `http://localhost:8080` | Panel URL (used in config share links) |
 | `PANEL_PORT` | `8080` | Panel port |

@@ -60,3 +60,24 @@ docker compose logs bao-init
 
 Tiles are served through the panel's `/tiles/…`. Check `curl -I http://<panel>/tiles/3/4/2.png` — expect 200 and an
 `X-Tile-Cache` header. The server needs access to `tile.openstreetmap.org`.
+
+## Slow downloads from GitHub through the VPN
+
+Symptom: `git clone` and archive downloads from GitHub run at 1–3 Mbit/s, other sites through the VPN are fine.
+
+Cause: packet loss of a few percent on the path from the VPS to home. Senders with loss-based congestion control
+(CUBIC, used by GitHub) collapse under it; senders with BBR are barely affected. Check: `iperf3 -u -R` through
+the tunnel shows loss VPS → home, `mtr` from the VPS shows loss on the last hops.
+
+Fix: terminate TCP on the VPS and send it home with BBR.
+
+1. On the VPS: `sh vps/github-proxy/install.sh` (set `PAC_PROXIES=<gateway>:3128,10.8.1.0:3128`). It enables BBR
+   and starts `gh-proxy` (HTTPS CONNECT, port 443 only) listening on the tunnel address `10.8.1.0:3128`.
+2. On the gateway: `PORT_FORWARDS=3128=10.8.1.0:3128` in `.env`, then `docker compose up -d awg-client` —
+   the proxy becomes available in the LAN as `<gateway>:3128`.
+3. Git: `git config --global http.https://github.com/.proxy http://<gateway>:3128`.
+4. Browser: system proxy setting "Use setup script" — `http://<gateway>:3128/proxy.pac` (GitHub domains only,
+   falls back to a direct connection).
+5. Large files: `aria2c -x16 -s16 --all-proxy=http://<gateway>:3128 <url>`.
+
+Result in a real network: 1.4 → 150–190 Mbit/s for a single stream.
