@@ -4,14 +4,14 @@
 
 | Container | Image | Role |
 |---|---|---|
-| `nc-awg-client` | `amneziavpn/amneziawg-go` | The gateway's AmneziaWG client. `network_mode: host`. All traffic arriving on the LAN interface goes into `awg0` (table 200), with NAT and MSS clamp. The protocol version matches the Amnezia server. |
-| `nc-postgres` | `postgres:16-alpine` | Clients, traffic buckets (5 min), connections, audit, alerts, operators, sessions, API tokens, saved filters, settings. |
-| `nc-openbao` | `openbao/openbao:2.6` | Secret store (KV v2 `amnezia/`), raft storage, static auto-unseal. |
-| `nc-bao-init` | `openbao/openbao:2.6` | One-shot idempotent bootstrap: init, KV, policy, `backend` AppRole, SSH key import. |
-| `nc-clickhouse` | `clickhouse/clickhouse-server:24.8` | `flows` table, `site_prefixes` table and the `sites` dictionary (`ip_trie`). Memory limits for small hosts. |
-| `nc-flow-collector` | goflow2 + Python | Receives NetFlow v5/v9, IPFIX (UDP 2055) and sFlow (UDP 6343), enriches records (country, ASN, direction, route, exporter, interfaces, TCP flags) and writes them to ClickHouse in batches. |
-| `nc-backend` | Python 3.12, FastAPI | REST API, SSE, background jobs. Several uvicorn processes. |
-| `nc-frontend` | nginx + React SPA | SPA static files, `/api` proxy, caching OpenStreetMap tile proxy at `/tiles`. |
+| `ac-awg-client` | `amneziavpn/amneziawg-go` | The gateway's AmneziaWG client. `network_mode: host`. All traffic arriving on the LAN interface goes into `awg0` (table 200), with NAT and MSS clamp. The protocol version matches the Amnezia server. |
+| `ac-postgres` | `postgres:16-alpine` | Clients, traffic buckets (5 min), connections, audit, alerts, operators, sessions, API tokens, saved filters, settings. |
+| `ac-openbao` | `openbao/openbao:2.6` | Secret store (KV v2 `amnezia/`), raft storage, static auto-unseal. |
+| `ac-bao-init` | `openbao/openbao:2.6` | One-shot idempotent bootstrap: init, KV, policy, `backend` AppRole, SSH key import. |
+| `ac-clickhouse` | `clickhouse/clickhouse-server:24.8` | `flows` table, `site_prefixes` table and the `sites` dictionary (`ip_trie`). Memory limits for small hosts. |
+| `ac-flow-collector` | goflow2 + Python | Receives NetFlow/IPFIX, enriches records (country, ASN, direction, route, local device) and writes them to ClickHouse in batches. |
+| `ac-backend` | Python 3.12, FastAPI | REST API, SSE, background jobs. Several uvicorn processes. |
+| `ac-frontend` | nginx + React SPA | SPA static files, `/api` proxy, caching OpenStreetMap tile proxy at `/tiles`. |
 
 Networks: `internal` (no outbound access: PostgreSQL, OpenBao, ClickHouse) and `egress` (backend, frontend, collector).
 
@@ -21,10 +21,7 @@ Layers (ports and adapters):
 
 - `domain` — value objects and enums with no I/O (`Role`, `ClientStatus`, `PeerRuntime`, …).
 - `ports` — abstractions: `VpnServerGateway`, `RouterGateway`, `SecretStore`, `GeoLocator`, `Notifier`, `CommandRunner`, `ConfigCodec`.
-- `adapters` — implementations: Amnezia in Docker over SSH, MikroTik over SSH, OpenBao (AppRole), DB-IP, Telegram, ClickHouse,
-  IEEE OUI, and `adapters/devices` — device drivers on a common model (`Snapshot`: facts, interfaces, neighbours,
-  endpoints, children) over REST / RCI / Open API (`mikrotik`, `appliances`, `controllers`), SSH CLI profiles and parsers
-  (`cli`, `parsers`), SNMP (`snmp`) and discovery (`discovery`).
+- `adapters` — implementations: Amnezia in Docker over SSH, MikroTik over SSH, OpenBao (AppRole), DB-IP, Telegram, ClickHouse.
 - `db` — SQLAlchemy models and repositories (a shared generic `Repository[T]`).
 - `services` — business logic: clients, policies, traffic, analytics, flows, routing, alerts, notifications, backups, authentication, tokens.
 - `api` — FastAPI routers and dependencies (authentication, RBAC, CSRF).
@@ -40,7 +37,7 @@ The API runs in several processes (`WEB_CONCURRENCY`). They coordinate through P
 - **Distributed lock** — all changes to `awg0.conf` are serialized across processes.
 - **LiveState** — a per-process cache of live metrics, fed from the bus.
 
-CPU-heavy work (QR codes, site list parsing, database decompression) runs in a thread pool.
+CPU-heavy work (argon2, QR codes, site list parsing, database decompression) runs in a thread pool.
 
 ### Background jobs (leader)
 
@@ -54,12 +51,6 @@ CPU-heavy work (QR codes, site list parsing, database decompression) runs in a t
 | backup | daily | Backup and rotation |
 | flow-schema | 5 min | ClickHouse schema and TTL |
 | purge | hourly | Delete statistics older than `retention_days` |
-| devices | 30 s | Poll devices whose `poll_seconds` elapsed (6 at a time), merge network clients, `device.down` alerts |
-| flow-enrichment | 2 min | Exporter, interface and LAN host names, local subnets → ClickHouse dictionaries |
-| flow-rules | 60 s | Traffic detection rules → alerts |
-| threats | `threat_refresh_hours` | Download public blocklists into the `threats` dictionary |
-| rdns | 10 min | Reverse DNS for the most active remote addresses |
-| oui | weekly | IEEE OUI registry for MAC vendors |
 
 ## Frontend
 
@@ -71,25 +62,15 @@ Form controls (select, checkbox, radio, number input) are custom components, so 
 ## PostgreSQL data model
 
 `panel_users`, `panel_sessions`, `api_tokens`, `vpn_clients`, `traffic_buckets`, `connection_events`, `audit_log`,
-`alerts`, `share_links`, `saved_filters`, `saved_views`, `settings`, `network_devices` (registry, facts, interfaces,
-neighbours, controller children as JSONB), `endpoint_sightings` (where each MAC was seen), `network_endpoints`
-(merged network clients), `flow_rules`. The schema is created at startup. Device credentials live in OpenBao
-`devices/<id>`.
+`alerts`, `share_links`, `saved_filters`, `settings`. The schema is created at startup.
 
 ## ClickHouse
 
 ```sql
-flows(TimeReceived DateTime, Direction Enum8('out','in','internal'), Route Enum8('direct','vpn'),
-      LocalAddr IPv6, RemoteAddr IPv6, Proto UInt8, LocalPort UInt16, RemotePort UInt16,
-      RemoteAS UInt32, RemoteASName String, RemoteCountry String, Bytes UInt64, Packets UInt64, Flows UInt32,
-      ExporterAddress IPv6, InIf UInt32, OutIf UInt32, TCPFlags UInt8, SamplingRate UInt32, ServicePort UInt16)
+flows(TimeReceived DateTime, Direction Enum8('out','in'), Route Enum8('direct','vpn'),
+      LocalAddr IPv4, RemoteAddr IPv4, Proto UInt8, LocalPort UInt16, RemotePort UInt16,
+      RemoteAS UInt32, RemoteASName String, RemoteCountry String, Bytes UInt64, Packets UInt64, Flows UInt32)
 ENGINE = MergeTree PARTITION BY toYYYYMMDD(TimeReceived) TTL TimeReceived + INTERVAL 30 DAY
 
-flows_5m, flows_1h  ← MATERIALIZED VIEW (SummingMergeTree, 90 days / 2 years)
-
-site_prefixes(prefix, site, grp)      →  DICTIONARY sites     LAYOUT(IP_TRIE())
-threat_prefixes(prefix, list)         →  DICTIONARY threats   LAYOUT(IP_TRIE())
-exporters_data, hosts_data, ptr_data  →  DICTIONARY exporters, hosts, ptr  LAYOUT(HASHED())
-if_names_data(addr, idx, name, speed) →  DICTIONARY if_names  LAYOUT(COMPLEX_KEY_HASHED())
-local_networks(prefix)                   read by the collector
+site_prefixes(prefix, site, grp)  →  DICTIONARY sites LAYOUT(IP_TRIE())
 ```

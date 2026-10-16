@@ -12,7 +12,7 @@ export interface Notice {
   read: boolean;
 }
 
-const STORAGE_KEY = "network-control.notifications";
+const STORAGE_KEY = "amnezia-control.notifications";
 const HISTORY_LIMIT = 100;
 const DURATION: Record<NoticeType, number> = { success: 4000, info: 5000, warning: 7000, error: 9000 };
 const DEDUPE_MS = 4000;

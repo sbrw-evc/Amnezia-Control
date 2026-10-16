@@ -6,5 +6,5 @@ RUN pip install --no-cache-dir httpx==0.28.1 maxminddb==2.6.2
 WORKDIR /srv
 COPY collector.py .
 ENV PYTHONUNBUFFERED=1
-EXPOSE 2055/udp 6343/udp
+EXPOSE 2055/udp
 CMD ["python", "collector.py"]

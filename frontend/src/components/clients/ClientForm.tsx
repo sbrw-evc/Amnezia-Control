@@ -2,14 +2,12 @@ import { useState, type FormEvent } from "react";
 import clsx from "clsx";
 import type { ClientInput } from "@/lib/api";
 import type { ServerKind, VpnClient, VpnServer } from "@/lib/types";
-import { k, t } from "@/i18n";
 import { Field, Segmented } from "@/components/ui/Primitives";
 import { NumberInput } from "@/components/ui/Controls";
 
 const GB = 1024 ** 3;
-/** Labels are English keys, drawn with t(). */
 const VALIDITY = [
-  { label: "∞", days: null }, { label: k("7 d"), days: 7 }, { label: k("30 d"), days: 30 }, { label: k("90 d"), days: 90 }, { label: k("1 year"), days: 365 },
+  { label: "∞", days: null }, { label: "7 дн", days: 7 }, { label: "30 дн", days: 30 }, { label: "90 дн", days: 90 }, { label: "1 год", days: 365 },
 ];
 
 function toLocalInput(iso: string | null | undefined) {
@@ -37,7 +35,7 @@ export default function ClientForm({ initial, submitLabel, busy, onSubmit, serve
     e.preventDefault();
     onSubmit({
       name: name.trim(), owner: owner.trim(), contact: contact.trim(), note,
-      tags: tags.split(",").map((tg) => tg.trim()).filter(Boolean),
+      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       expires_at: expires ? new Date(expires).toISOString() : null,
       quota_gb: quota ? Number(quota) : null,
       ...(servers ? { server } : {}),
@@ -47,32 +45,31 @@ export default function ClientForm({ initial, submitLabel, busy, onSubmit, serve
   return (
     <form onSubmit={submit} className="space-y-4">
       {servers && servers.length > 1 && (
-        <Field label={t("VPN server")} hint={current && !current.ready ? t("WireGuard on MikroTik is not set up — set it up on the “VPN on MikroTik” page")
-          : server === "mikrotik" ? t("WireGuard on the home router: access to the local network, and sites from the list go through Amnezia") : t("AmneziaWG on a VPS with traffic obfuscation")}>
+        <Field label="VPN-сервер" hint={current && !current.ready ? "WireGuard на MikroTik не настроен — настройте его на странице «VPN на MikroTik»" : server === "mikrotik" ? "WireGuard на домашнем роутере: доступ к локальной сети и сайты из списка через Amnezia" : "AmneziaWG на VPS с обфускацией трафика"}>
           <Segmented layoutId="client-server" value={server} onChange={setServer}
             options={servers.map((s) => ({ value: s.kind, label: s.title }))} />
         </Field>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("Name *")}><input className="input" required autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Anna's iPhone")} /></Field>
-        <Field label={t("Owner")}><input className="input" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder={t("Anna")} /></Field>
-        <Field label={t("Contact")}><input className="input" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="@telegram / email" /></Field>
-        <Field label={t("Tags")} hint={t("comma-separated: family, work")}><input className="input" value={tags} onChange={(e) => setTags(e.target.value)} /></Field>
+        <Field label="Имя *"><input className="input" required autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="iPhone Анны" /></Field>
+        <Field label="Владелец"><input className="input" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Анна" /></Field>
+        <Field label="Контакт"><input className="input" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="@telegram / email" /></Field>
+        <Field label="Теги" hint="через запятую: семья, работа"><input className="input" value={tags} onChange={(e) => setTags(e.target.value)} /></Field>
       </div>
-      <Field label={t("Access period")} hint={t("when it ends, the client is blocked automatically")}>
+      <Field label="Срок доступа" hint="по истечении клиент блокируется автоматически">
         <div className="flex flex-wrap items-center gap-2">
           <input type="datetime-local" className="input max-w-[230px]" value={expires} onChange={(e) => setExpires(e.target.value)} />
           {VALIDITY.map((v) => (
             <button type="button" key={v.label} onClick={() => preset(v.days)}
-              className={clsx("chip", (v.days === null && !expires) && "chip-on")}>{t(v.label)}</button>
+              className={clsx("chip", (v.days === null && !expires) && "chip-on")}>{v.label}</button>
           ))}
         </div>
       </Field>
-      <Field label={t("Monthly quota, GB")} hint={t("empty — no limit; when exceeded, blocked until the 1st of the month")}>
+      <Field label="Месячная квота, ГБ" hint="пусто — без ограничений; при превышении блокировка до 1-го числа">
         <NumberInput className="max-w-[200px]" value={quota ? Number(quota) : null} min={0} step={0.5} allowEmpty placeholder="∞"
           onChange={(v) => setQuota(v === null ? "" : String(v))} />
       </Field>
-      <Field label={t("Note")}><textarea className="input min-h-[70px]" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+      <Field label="Заметка"><textarea className="input min-h-[70px]" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
       <div className="flex justify-end"><button className="btn-primary" disabled={busy || !name.trim() || (current && !current.ready)}>{submitLabel}</button></div>
     </form>
   );

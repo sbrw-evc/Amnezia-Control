@@ -2,7 +2,7 @@
 
 ## Что входит в архив
 
-`data/backend/backups/network-control-YYYYMMDD-HHMMSS.tar.gz`:
+`data/backend/backups/amnezia-control-YYYYMMDD-HHMMSS.tar.gz`:
 
 | Файл | Содержимое |
 |---|---|
@@ -27,18 +27,26 @@
 3. Восстановите OpenBao:
 
    ```bash
-   tar xzf network-control-*.tar.gz openbao.snap
-   docker cp openbao.snap nc-openbao:/tmp/
+   tar xzf amnezia-control-*.tar.gz openbao.snap
+   docker cp openbao.snap ac-openbao:/tmp/
    docker exec -e BAO_ADDR=http://127.0.0.1:8200 \
      -e BAO_TOKEN=$(sed -n 's/.*"root_token": *"\([^"]*\)".*/\1/p' data/bao-init/init.json) \
-     nc-openbao bao operator raft snapshot restore -force /tmp/openbao.snap
+     ac-openbao bao operator raft snapshot restore -force /tmp/openbao.snap
    ```
 
 4. Восстановите базу (таблицы очищаются и заполняются из архива):
 
    ```bash
-   cp network-control-*.tar.gz data/backend/backups/
-   docker compose run --rm backend python -m app.cli restore-db /data/backups/network-control-YYYYMMDD-HHMMSS.tar.gz
+   cp amnezia-control-*.tar.gz data/backend/backups/
+   docker compose run --rm backend python -m app.cli restore-db /data/backups/amnezia-control-YYYYMMDD-HHMMSS.tar.gz
    ```
 
 5. Запустите остальные сервисы: `docker compose up -d`.
+
+## Сброс пароля администратора
+
+```bash
+docker compose exec backend python -m app.cli reset-password admin
+```
+
+Команда выводит временный пароль, завершает сессии пользователя и требует смены пароля при входе.

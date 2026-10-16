@@ -1,11 +1,9 @@
-# Network Control
+# Amnezia Control
 
 [[English|Home]] · **Русский**
 
-**Network Control** управляет домашней или корпоративной сетью: устройства 25+ платформ (MikroTik, TP-Link / Omada,
-UniFi, Keenetic, OpenWrt, OPNsense, pfSense, Cisco, HP / Aruba, Dell, Zyxel, Juniper, Huawei, FortiGate, Eltex, SNMP),
-живая карта сети со всеми клиентами, анализ потоков с правилами обнаружения и списками угроз — вместе с self-hosted VPN
-на AmneziaWG и выборочной маршрутизацией (сайты из списка — через туннель, остальное — через провайдера).
+**Amnezia Control** — панель управления self-hosted VPN на базе AmneziaWG и выборочной маршрутизации домашней сети:
+сайты из списка идут через туннель, остальной трафик — напрямую через провайдера.
 
 ## Содержание
 
@@ -18,11 +16,9 @@ UniFi, Keenetic, OpenWrt, OPNsense, pfSense, Cisco, HP / Aruba, Dell, Zyxel, Jun
 | [[Клиенты VPN|ru-Clients]] | Жизненный цикл клиентов VPN, квоты, сроки, выдача конфигов |
 | [[VPN на MikroTik|ru-MikroTik-VPN]] | WireGuard-сервер на MikroTik: настройка, клиенты, конфиги |
 | [[Мониторинг и алерты|ru-Monitoring]] | Дашборд, аналитика, карта, алерты, Telegram |
-| [[Сетевые устройства|ru-Devices]] | Платформы, добавление устройств, опрос, настройка из панели, клиенты сети |
-| [[Карта сети|ru-Network-Map]] | Живая карта сети |
-| [[Анализ потоков|ru-Flows]] | Анализ потоков: экспортёры, измерения, язык фильтров, агрегаты, правила, угрозы |
+| [[Анализ потоков|ru-Flows]] | Анализ потоков: ClickHouse, измерения, язык фильтров, примеры |
 | [[Маршрутизация|ru-Routing]] | Список сайтов, свои подсети, проверка маршрута |
-| [[Безопасность|ru-Security]] | Вход через SPA, роли, сессии, API-токены, OpenBao, аудит |
+| [[Безопасность|ru-Security]] | Роли, 2FA, сессии, API-токены, OpenBao, аудит |
 | [[Резервное копирование|ru-Backups]] | Резервное копирование и восстановление |
 | [[API|ru-API]] | REST API, авторизация токеном, SSE |
 | [[Диагностика|ru-Troubleshooting]] | Диагностика и частые проблемы |
@@ -33,8 +29,8 @@ UniFi, Keenetic, OpenWrt, OPNsense, pfSense, Cisco, HP / Aruba, Dell, Zyxel, Jun
 ```
  устройства LAN ──► MikroTik ──(dst ∈ vpn-sites)──► шлюз (LXC/VM с Docker) ──awg0──► сервер Amnezia (VPS)
                        │  └──(остальное)──► провайдер
-                       └── NetFlow / IPFIX / sFlow (любое устройство) ──► flow-collector ──► ClickHouse
- браузер ──► Network Control (nginx → FastAPI) ──► PostgreSQL · OpenBao · ClickHouse · SSH к VPS и MikroTik
+                       └── NetFlow v9 ──► flow-collector ──► ClickHouse
+ браузер ──► Amnezia Control (nginx → FastAPI) ──► PostgreSQL · OpenBao · ClickHouse · SSH к VPS и MikroTik
 ```
 
 ## Основные возможности
@@ -42,9 +38,6 @@ UniFi, Keenetic, OpenWrt, OPNsense, pfSense, Cisco, HP / Aruba, Dell, Zyxel, Jun
 - Управление клиентами AmneziaWG: создание, блокировка, сроки, квоты, перевыпуск ключей, массовые операции.
 - QR / `.conf` / `vpn://` и одноразовые ссылки для выдачи доступа.
 - Live-мониторинг, аналитика трафика, карта подключений на OpenStreetMap.
-- Сетевые устройства: инвентарь, интерфейсы, соседи, клиенты, настройки, CLI, резервные копии; поиск в сети.
-- Карта сети по LLDP / CDP / MNDP, контроллерам, портам коммутаторов и Wi-Fi, с трафиком клиентов.
-- Анализ потоков в стиле Akvorado / Umbrella Flow: экспортёры и интерфейсы, приложения, агрегаты, правила DDoS /
-  сканирования / аномалий, списки угроз, обратный DNS, сохранённые представления.
+- Анализ сетевых потоков в стиле Akvorado.
 - Всплывающие уведомления и центр уведомлений, алерты и уведомления в Telegram, журнал аудита, резервные копии.
-- Вход и доступ управляются в SPA (единая точка авторизации), RBAC, API-токены, секреты в OpenBao.
+- RBAC, 2FA, API-токены, секреты в OpenBao.

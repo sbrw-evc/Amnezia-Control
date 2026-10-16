@@ -75,7 +75,7 @@ class VpnClientService:
     def backend(self, kind: str) -> VpnBackend:
         b = self.backends.get(kind)
         if not b:
-            raise DomainError(f"Unknown VPN server: {kind}")
+            raise DomainError(f"Неизвестный VPN-сервер: {kind}")
         return b
 
     async def servers(self) -> list[dict]:
@@ -114,7 +114,7 @@ class VpnClientService:
                      server: str = "amnezia") -> dict:
         name = name.strip()[:128]
         if not name:
-            raise DomainError("Enter a client name")
+            raise DomainError("Укажите имя клиента")
         backend = self.backend(server)
         keys = generate_keypair()
         peer = await backend.add_peer(keys.public_key, name)
@@ -159,7 +159,7 @@ class VpnClientService:
         async with self._db.session() as s:
             c = await ClientRepo(s).require(client_id)
             if c.system and blocked:
-                raise DomainError("The system client (home gateway) cannot be blocked")
+                raise DomainError("Системный клиент (домашний шлюз) нельзя блокировать")
             pub, server = c.public_key, c.server
         await self.backend(server).set_disabled(pub, blocked)
         async with self._db.session() as s:
@@ -192,7 +192,7 @@ class VpnClientService:
         async with self._db.session() as s:
             c = await ClientRepo(s).require(client_id)
             if c.system:
-                raise DomainError("The system client (home gateway) cannot be removed from the panel")
+                raise DomainError("Системный клиент (домашний шлюз) нельзя удалить из панели")
             pub, server = c.public_key, c.server
         await self.backend(server).remove_peer(pub)
         await self._secrets.delete(self._secret_path(client_id))
@@ -206,7 +206,7 @@ class VpnClientService:
         ops = {"block": lambda i: self.set_blocked(actor, i, True), "unblock": lambda i: self.set_blocked(actor, i, False),
                "delete": lambda i: self.delete(actor, i)}
         if action not in ops:
-            raise DomainError("Unknown action")
+            raise DomainError("Неизвестное действие")
         done, failed = 0, []
         for i in ids:
             try:
@@ -221,11 +221,11 @@ class VpnClientService:
         async with self._db.session() as s:
             c = await ClientRepo(s).require(client_id)
             if not c.managed:
-                raise DomainError("The key of this client is unknown to the panel (it was created outside the panel). "
-                                  "Reissue the keys to get a config.")
+                raise DomainError("Ключ этого клиента панели неизвестен (создан вне панели). "
+                                  "Перевыпустите ключи, чтобы получить конфиг.")
             secret = await self._secrets.get(self._secret_path(c.id))
             if not secret:
-                raise DomainError("The client key was not found in OpenBao. Reissue the keys.")
+                raise DomainError("Ключ клиента не найден в OpenBao. Перевыпустите ключи.")
             bundle = await self.backend(c.server).bundle(
                 name=c.name, private_key=secret["private_key"], public_key=c.public_key, address=c.address,
                 preshared_key=secret.get("psk"))
@@ -240,7 +240,7 @@ class VpnClientService:
         async with self._db.session() as s:
             c = await ClientRepo(s).require(client_id)
             if not c.managed:
-                raise DomainError("Reissue the client keys first")
+                raise DomainError("Сначала перевыпустите ключи клиента")
             expires = utcnow() + dt.timedelta(hours=hours)
             ShareRepo(s).add(ShareLink(token_hash=hashlib.sha256(token.encode()).hexdigest(), client_id=c.id,
                                        created_by=actor.username, expires_at=expires, uses_left=3))
@@ -251,7 +251,7 @@ class VpnClientService:
         async with self._db.session() as s:
             link = await ShareRepo(s).get(hashlib.sha256(token.encode()).hexdigest())
             if not link or link.expires_at < utcnow() or link.uses_left <= 0:
-                raise NotFound("The link is invalid or has expired")
+                raise NotFound("Ссылка недействительна или истекла")
             link.uses_left -= 1
             client_id = link.client_id
             c = await ClientRepo(s).require(client_id)

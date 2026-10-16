@@ -15,7 +15,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/network-control
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/amnezia-control
 
 jobs:
   images:
@@ -27,13 +27,13 @@ jobs:
         include:
           - component: backend
             platforms: linux/amd64,linux/arm64
-            description: Network Control API, background jobs and SSE
+            description: Amnezia Control API, background jobs and SSE
           - component: frontend
             platforms: linux/amd64,linux/arm64
-            description: Network Control web UI with API and map tile proxy
+            description: Amnezia Control web UI with API and map tile proxy
           - component: flow-collector
             platforms: linux/amd64,linux/arm64
-            description: NetFlow / IPFIX / sFlow collector with enrichment for ClickHouse
+            description: NetFlow/IPFIX collector with enrichment for ClickHouse
           - component: awg-client
             platforms: linux/amd64
             description: AmneziaWG gateway client for selective LAN routing
@@ -61,7 +61,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || github.ref_name }}
             type=raw,value=latest
           labels: |
-            org.opencontainers.image.title=network-control-${{ matrix.component }}
+            org.opencontainers.image.title=amnezia-control-${{ matrix.component }}
             org.opencontainers.image.description=${{ matrix.description }}
             org.opencontainers.image.licenses=MIT
           annotations: |
@@ -91,19 +91,19 @@ jobs:
         run: |
           TAG="${{ inputs.tag || github.ref_name }}"
           VERSION="${TAG#v}"
-          mkdir -p dist/network-control-$VERSION
+          mkdir -p dist/amnezia-control-$VERSION
           cp -r docker-compose.yml .env.example install.sh LICENSE README.md README.ru.md \
-            awg-client backend frontend flow-collector openbao clickhouse mikrotik dist/network-control-$VERSION/
-          sed -i "s/^NC_VERSION=.*/NC_VERSION=$VERSION/" dist/network-control-$VERSION/.env.example
-          tar -C dist -czf dist/network-control-$VERSION-deploy.tar.gz network-control-$VERSION
-          ( cd dist && sha256sum network-control-$VERSION-deploy.tar.gz > SHA256SUMS )
+            awg-client backend frontend flow-collector openbao clickhouse mikrotik dist/amnezia-control-$VERSION/
+          sed -i "s/^AC_VERSION=.*/AC_VERSION=$VERSION/" dist/amnezia-control-$VERSION/.env.example
+          tar -C dist -czf dist/amnezia-control-$VERSION-deploy.tar.gz amnezia-control-$VERSION
+          ( cd dist && sha256sum amnezia-control-$VERSION-deploy.tar.gz > SHA256SUMS )
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
-          name: Network Control ${{ inputs.tag || github.ref_name }}
+          name: Amnezia Control ${{ inputs.tag || github.ref_name }}
           body_path: .github/release-notes/${{ inputs.tag || github.ref_name }}.md
           make_latest: true
           files: |
-            dist/network-control-*-deploy.tar.gz
+            dist/amnezia-control-*-deploy.tar.gz
             dist/SHA256SUMS

@@ -38,7 +38,7 @@ class AwgConfigCodec(ConfigCodec):
                 cur["lines"].append(line)
         iface = next((b for b in blocks if b["type"] == "[Interface]"), None)
         if not iface:
-            raise ExternalServiceError("The server config has no [Interface] section")
+            raise ExternalServiceError("в конфиге сервера нет секции [Interface]")
         peers = []
         for b in blocks:
             if b["type"] != "[Peer]":
@@ -134,7 +134,7 @@ class AmneziaDockerGateway(VpnServerGateway):
 
     async def read_backup(self, name: str) -> str:
         if not re.fullmatch(r"[\w.\-]+", name):
-            raise ExternalServiceError("Invalid backup name")
+            raise ExternalServiceError("недопустимое имя резервной копии")
         return await self._exec(f"cat {self._dir}/backups/{name}")
 
     async def versions(self) -> dict:

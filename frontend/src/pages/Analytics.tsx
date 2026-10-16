@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart3, Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { k, t, tServer } from "@/i18n";
 import { api } from "@/lib/api";
 import { Fmt } from "@/lib/format";
 import Flag from "@/components/ui/Flag";
@@ -12,7 +11,7 @@ import { Skeleton } from "@/components/ui/Feedback";
 import { Donut, Heatmap, TopBars, TrafficChart } from "@/components/charts/Charts";
 
 const RANGES: { value: Range; label: string }[] = [
-  { value: "1h", label: k("1 h") }, { value: "24h", label: k("24 h") }, { value: "7d", label: k("7 d") }, { value: "30d", label: k("30 d") }, { value: "90d", label: k("90 d") },
+  { value: "1h", label: "1 ч" }, { value: "24h", label: "24 ч" }, { value: "7d", label: "7 дн" }, { value: "30d", label: "30 дн" }, { value: "90d", label: "90 дн" },
 ];
 const PALETTE = ["#3b82f6", "#f59e0b", "#34d399", "#a78bfa", "#f472b6", "#22d3ee", "#facc15", "#fb7185"];
 
@@ -43,42 +42,42 @@ export default function Analytics() {
 
   return (
     <Page>
-      <PageHeader title={t("Analytics")} icon={<BarChart3 size={20} />} subtitle={t("Volumes, activity and geography of clients")}
+      <PageHeader title="Аналитика" icon={<BarChart3 size={20} />} subtitle="Объёмы, активность и география клиентов"
         actions={<>
-          <Segmented layoutId="an-range" value={range} onChange={setRange} options={RANGES.map((r) => ({ ...r, label: t(r.label) }))} />
+          <Segmented layoutId="an-range" value={range} onChange={setRange} options={RANGES} />
           <button className="btn-ghost btn-sm" disabled={!top.data} onClick={() => exportCsv(`traffic-${range}.csv`,
-            [[t("Client"), t("Download, bytes"), t("Upload, bytes"), t("Total, bytes")], ...(top.data ?? []).map((r) => [r.name, r.rx, r.tx, r.total])])}>
+            [["Клиент", "Загрузка, байт", "Отдача, байт", "Всего, байт"], ...(top.data ?? []).map((r) => [r.name, r.rx, r.tx, r.total])])}>
             <Download size={14} /> CSV
           </button>
         </>} />
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <Kpi label={t("Downloaded by clients")} value={totals.rx} format={(n) => Fmt.bytes(n)} icon={<span className="text-xs">↓</span>} />
-        <Kpi label={t("Uploaded by clients")} value={totals.tx} format={(n) => Fmt.bytes(n)} icon={<span className="text-xs">↑</span>} tone="amber" delay={0.05} />
-        <Kpi label={t("Peak per interval")} value={totals.peak} format={(n) => Fmt.bytes(n)} icon={<span className="text-xs">▲</span>} tone="violet" delay={0.1} hint={series.data ? t("step {step}", { step: tServer(series.data.step) }) : ""} />
-        <Kpi label={t("Active clients")} value={totals.active} icon={<span className="text-xs">●</span>} tone="green" delay={0.15} hint={t("with traffic in the period")} />
+        <Kpi label="Загружено клиентами" value={totals.rx} format={(n) => Fmt.bytes(n)} icon={<span className="text-xs">↓</span>} />
+        <Kpi label="Отдано клиентами" value={totals.tx} format={(n) => Fmt.bytes(n)} icon={<span className="text-xs">↑</span>} tone="amber" delay={0.05} />
+        <Kpi label="Пик за интервал" value={totals.peak} format={(n) => Fmt.bytes(n)} icon={<span className="text-xs">▲</span>} tone="violet" delay={0.1} hint={series.data ? `шаг ${series.data.step}` : ""} />
+        <Kpi label="Активных клиентов" value={totals.active} icon={<span className="text-xs">●</span>} tone="green" delay={0.15} hint="с трафиком за период" />
       </div>
 
-      <Card title={t("Traffic via VPN")}>
+      <Card title="Трафик через VPN">
         {series.data ? <TrafficChart points={series.data.points} height={320} /> : <Skeleton className="h-[320px]" />}
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card title={t("Top clients")}>
-          {top.data ? (top.data.length ? <TopBars rows={top.data} onClick={(id) => nav(`/clients/${id}`)} /> : <div className="py-12 text-center text-sm text-slate-500">{t("No data for the period")}</div>) : <Skeleton className="h-64" />}
+        <Card title="Топ клиентов">
+          {top.data ? (top.data.length ? <TopBars rows={top.data} onClick={(id) => nav(`/clients/${id}`)} /> : <div className="py-12 text-center text-sm text-slate-500">Нет данных за период</div>) : <Skeleton className="h-64" />}
         </Card>
-        <Card title={t("Activity by hour and day of the week")}>
+        <Card title="Активность по часам и дням недели">
           {heat.data ? <Heatmap cells={heat.data} /> : <Skeleton className="h-64" />}
         </Card>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <Card title={t("Connections by country")}>
+        <Card title="Подключения по странам">
           {geo.data ? <Donut data={geo.data.countries.slice(0, 8).map((c, i) => ({ name: c.country, value: c.connections, color: PALETTE[i % PALETTE.length] }))} height={260} /> : <Skeleton className="h-64" />}
         </Card>
-        <Card className="xl:col-span-2" title={t("Countries")} bodyClass="p-0">
-          <table className="table-nc">
-            <thead><tr><th>{t("Country")}</th><th>{t("Connections")}</th><th>{t("Client count")}</th><th className="w-1/3">{t("Share")}</th></tr></thead>
+        <Card className="xl:col-span-2" title="Страны" bodyClass="p-0">
+          <table className="table-ac">
+            <thead><tr><th>Страна</th><th>Подключений</th><th>Клиентов</th><th className="w-1/3">Доля</th></tr></thead>
             <tbody>
               {(geo.data?.countries ?? []).map((c) => {
                 const total = geo.data!.countries.reduce((a, x) => a + x.connections, 0) || 1;
@@ -91,7 +90,7 @@ export default function Analytics() {
                   </tr>
                 );
               })}
-              {geo.data && !geo.data.countries.length && <tr><td colSpan={4} className="py-8 text-center text-slate-500">{t("No connection data")}</td></tr>}
+              {geo.data && !geo.data.countries.length && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Нет данных о подключениях</td></tr>}
             </tbody>
           </table>
         </Card>

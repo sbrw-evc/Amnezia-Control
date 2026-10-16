@@ -2,14 +2,10 @@ import type {
   Alert, ApiTokenInfo, AuditItem, BackupItem, CustomPrefix, FlowField, FlowOverview, FlowQuery, FlowRecord, FlowResult,
   FlowStatus, RouteCheck, SavedFilter, ClientBundle, GeoData, HeatCell, LivePoint, PanelUser, Range, RouterStatus, SeriesPoint,
   MikrotikVpnInfo, ServerInfo, ServerKind, Session, Settings, SiteListSummary, Summary, TopRow, VpnClient, VpnServer,
-  AuthConfig, SpaStatus,
-  DeviceAction, DevicePlatform, DiscoveryResult, FlowExporter, FlowRule, FlowRuleKind, NetworkDevice, NetworkEndpoint,
-  SavedView, ThreatInfo, Topology, Onboarding,
 } from "./types";
-import { t, tServer } from "@/i18n";
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public code?: string, public violations?: string[]) {
+  constructor(public status: number, message: string) {
     super(message);
   }
 }
@@ -30,7 +26,7 @@ export class HttpClient {
   }
 
   async request<T>(method: string, path: string, opts: { body?: unknown; query?: Query; form?: FormData; silent401?: boolean } = {}): Promise<T> {
-    const headers: Record<string, string> = { "X-Requested-With": "network-control" };
+    const headers: Record<string, string> = { "X-Requested-With": "amnezia-control" };
     let body: BodyInit | undefined;
     if (opts.form) body = opts.form;
     else if (opts.body !== undefined) {
@@ -41,9 +37,7 @@ export class HttpClient {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
       if (r.status === 401 && !opts.silent401) this.onUnauthorized?.();
-      const detail = (data as { detail?: unknown }).detail;
-      const text = typeof detail === "string" ? tServer(detail) : Array.isArray(detail) ? t("Check the entered values") : t("Error {status}", { status: r.status });
-      throw new ApiError(r.status, text, (data as { code?: string }).code, (data as { violations?: string[] }).violations);
+      throw new ApiError(r.status, (data as { detail?: string }).detail || `Ошибка ${r.status}`);
     }
     return data as T;
   }
@@ -59,18 +53,19 @@ abstract class Resource {
   constructor(protected readonly http: HttpClient) {}
 }
 
-/** Sign-in goes through SPA (Single Point of Authorization); the application keeps only its own sessions. */
 export class AuthApi extends Resource {
-  config() { return this.http.request<AuthConfig>("GET", "/api/auth/config", { silent401: true }); }
-  /** The address that starts the sign-in at SPA and comes back to `returnTo`. */
-  startUrl(returnTo = "/", opts: { prompt?: "login" } = {}) {
-    const q = new URLSearchParams({ return: returnTo, ...(opts.prompt ? { prompt: opts.prompt } : {}) });
-    return `/api/auth/spa/start?${q}`;
+  login(username: string, password: string) {
+    return this.http.request<{ requires_2fa: boolean; user: PanelUser | null }>("POST", "/api/auth/login", { body: { username, password }, silent401: true });
   }
-  logout() { return this.http.post<{ ok: boolean; redirect: string | null }>("/api/auth/logout"); }
+  verify2fa(code: string) { return this.http.request<{ user: PanelUser }>("POST", "/api/auth/2fa", { body: { code }, silent401: true }); }
+  logout() { return this.http.post("/api/auth/logout"); }
   me() { return this.http.request<PanelUser>("GET", "/api/auth/me", { silent401: true }); }
+  changePassword(current: string, next: string) { return this.http.post("/api/auth/password", { current, new: next }); }
   sessions() { return this.http.get<Session[]>("/api/auth/sessions"); }
   revokeSession(id: string) { return this.http.delete(`/api/auth/sessions/${id}`); }
+  totpSetup() { return this.http.post<{ secret: string; uri: string; qr_svg: string }>("/api/auth/totp/setup"); }
+  totpEnable(code: string) { return this.http.post("/api/auth/totp/enable", { code }); }
+  totpDisable() { return this.http.post("/api/auth/totp/disable"); }
 }
 
 export interface ClientInput {
@@ -130,8 +125,11 @@ export class OpsApi extends Resource {
 
 export class UsersApi extends Resource {
   list() { return this.http.get<PanelUser[]>("/api/users"); }
-  spa() { return this.http.get<SpaStatus>("/api/spa"); }
-  sync() { return this.http.post<{ connected: boolean; created?: number; updated?: number; disabled?: number; unchanged?: boolean }>("/api/spa/sync"); }
+  create(d: { username: string; display_name: string; role: string; password: string }) { return this.http.post<PanelUser>("/api/users", d); }
+  update(id: number, d: Partial<Pick<PanelUser, "display_name" | "role" | "is_active">>) { return this.http.patch<PanelUser>(`/api/users/${id}`, d); }
+  resetPassword(id: number, password: string) { return this.http.post(`/api/users/${id}/password`, { password }); }
+  disableTotp(id: number) { return this.http.post(`/api/users/${id}/totp/disable`); }
+  remove(id: number) { return this.http.delete(`/api/users/${id}`); }
 }
 
 export class AdminApi extends Resource {
@@ -160,47 +158,6 @@ export class FlowsApi extends Resource {
   filters() { return this.http.get<SavedFilter[]>("/api/flows/filters"); }
   saveFilter(name: string, filter: string, shared: boolean) { return this.http.post<{ id: number }>("/api/flows/filters", { name, filter, shared }); }
   deleteFilter(id: number) { return this.http.delete(`/api/flows/filters/${id}`); }
-  exporters() { return this.http.get<FlowExporter[]>("/api/flows/exporters"); }
-  ruleKinds() { return this.http.get<FlowRuleKind[]>("/api/flows/rules/kinds"); }
-  rules() { return this.http.get<FlowRule[]>("/api/flows/rules"); }
-  createRule(d: Partial<FlowRule>) { return this.http.post<FlowRule>("/api/flows/rules", d); }
-  updateRule(id: number, d: Partial<FlowRule>) { return this.http.patch<FlowRule>(`/api/flows/rules/${id}`, d); }
-  deleteRule(id: number) { return this.http.delete(`/api/flows/rules/${id}`); }
-  testRule(id: number) { return this.http.post<{ group: string; label: string; value: number; text: string; link?: string }[]>(`/api/flows/rules/${id}/test`); }
-  threats(hours = 24) { return this.http.get<ThreatInfo>("/api/flows/threats", { hours }); }
-  refreshThreats() { return this.http.post<{ prefixes: number }>("/api/flows/threats/refresh"); }
-  views() { return this.http.get<SavedView[]>("/api/flows/views"); }
-  saveView(name: string, state: Record<string, unknown>, shared = true) { return this.http.post<{ id: number }>("/api/flows/views", { name, state, shared }); }
-  deleteView(id: number) { return this.http.delete(`/api/flows/views/${id}`); }
-}
-
-export type DeviceInput = Partial<Omit<NetworkDevice, "credentials">> & { credentials?: Record<string, string | null>; clear_credentials?: string[] };
-
-export class DevicesApi extends Resource {
-  platforms() { return this.http.get<DevicePlatform[]>("/api/devices/platforms"); }
-  list() { return this.http.get<NetworkDevice[]>("/api/devices"); }
-  get(id: string) { return this.http.get<NetworkDevice>(`/api/devices/${id}`); }
-  create(d: DeviceInput) { return this.http.post<NetworkDevice>("/api/devices", d); }
-  update(id: string, d: DeviceInput) { return this.http.patch<NetworkDevice>(`/api/devices/${id}`, d); }
-  remove(id: string) { return this.http.delete(`/api/devices/${id}`); }
-  test(d: DeviceInput & { id?: string }) { return this.http.post<{ ok: boolean; facts: Record<string, unknown>; interfaces: number; neighbors: number; endpoints: number; children: number }>("/api/devices/test", d); }
-  poll(id: string) { return this.http.post<{ ok: boolean; error: string }>(`/api/devices/${id}/poll`); }
-  action(id: string, action: DeviceAction, params: Record<string, unknown> = {}) { return this.http.post<{ ok: boolean; output: string }>(`/api/devices/${id}/actions`, { action, params }); }
-  backupUrl(id: string) { return `/api/devices/${id}/backup`; }
-  resetHostKey(id: string) { return this.http.post(`/api/devices/${id}/reset-host-key`); }
-  discover(target: string, community = "public") { return this.http.post<DiscoveryResult[]>("/api/devices/discover", { target, community }); }
-  endpoints(q?: { q?: string; online?: boolean; device_id?: string }) { return this.http.get<NetworkEndpoint[]>("/api/endpoints", q); }
-  updateEndpoint(mac: string, d: { alias?: string; note?: string }) { return this.http.patch<NetworkEndpoint>(`/api/endpoints/${encodeURIComponent(mac)}`, d); }
-  forgetEndpoint(mac: string) { return this.http.delete(`/api/endpoints/${encodeURIComponent(mac)}`); }
-  blockEndpoint(mac: string, blocked: boolean) { return this.http.post<{ ok: boolean; output: string }>(`/api/endpoints/${encodeURIComponent(mac)}/block`, { blocked }); }
-  topology(offline = false, endpoints = true) { return this.http.get<Topology>("/api/topology", { offline, endpoints }); }
-  savePositions(p: Record<string, [number, number] | null>) { return this.http.put("/api/topology/positions", p); }
-}
-
-/** Business processes: the "First steps" checklist of the overview and the setup guides of the pages. */
-export class OnboardingApi extends Resource {
-  checklist() { return this.http.get<Onboarding>("/api/onboarding"); }
-  guide(page: string) { return this.http.get<Onboarding>(`/api/guides/${encodeURIComponent(page)}`); }
 }
 
 export class ApiClient {
@@ -212,8 +169,6 @@ export class ApiClient {
   readonly users = new UsersApi(this.http);
   readonly admin = new AdminApi(this.http);
   readonly flows = new FlowsApi(this.http);
-  readonly devices = new DevicesApi(this.http);
-  readonly onboarding = new OnboardingApi(this.http);
 }
 
 export const api = new ApiClient();

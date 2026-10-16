@@ -86,7 +86,7 @@ class TrafficCollector:
                 runtime.update(await b.runtime())
             except ExternalServiceError as e:
                 ok = False
-                await self._alerts.raise_(b.alert_key, Severity.CRITICAL, f"VPN server {b.title} is unreachable", e.message)
+                await self._alerts.raise_(b.alert_key, Severity.CRITICAL, f"VPN-сервер {b.title} недоступен", e.message)
                 continue
             await self._alerts.resolve(b.alert_key)
         return runtime, ok

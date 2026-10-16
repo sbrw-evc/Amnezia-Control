@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from ..container import Container
 from .deps import Principal, admin, container, current, viewer
-from .schemas import ServerConfigIn
+from .schemas import PanelUserIn, PanelUserPatch, PasswordResetIn, ServerConfigIn
 
 router = APIRouter(prefix="/api")
 
@@ -145,11 +145,31 @@ async def users(_: Principal = Depends(admin), c: Container = Depends(container)
     return await c.users.list()
 
 
-@router.get("/spa")
-async def spa_status(_: Principal = Depends(admin), c: Container = Depends(container)):
-    return await c.spa.status()
+@router.post("/users")
+async def users_create(body: PanelUserIn, p: Principal = Depends(admin), c: Container = Depends(container)):
+    return await c.users.create(p.actor, body.username, body.display_name, body.role, body.password)
 
 
-@router.post("/spa/sync")
-async def spa_sync(p: Principal = Depends(admin), c: Container = Depends(container)):
-    return await c.spa.sync(force=True, actor=p.actor)
+@router.patch("/users/{user_id}")
+async def users_update(user_id: int, body: PanelUserPatch, p: Principal = Depends(admin),
+                       c: Container = Depends(container)):
+    return await c.users.update(p.actor, user_id, **body.model_dump(exclude_unset=True))
+
+
+@router.post("/users/{user_id}/password")
+async def users_password(user_id: int, body: PasswordResetIn, p: Principal = Depends(admin),
+                         c: Container = Depends(container)):
+    await c.users.reset_password(p.actor, user_id, body.password)
+    return {"ok": True}
+
+
+@router.post("/users/{user_id}/totp/disable")
+async def users_totp_disable(user_id: int, p: Principal = Depends(admin), c: Container = Depends(container)):
+    await c.auth.totp_disable(user_id, p.actor)
+    return {"ok": True}
+
+
+@router.delete("/users/{user_id}")
+async def users_delete(user_id: int, p: Principal = Depends(admin), c: Container = Depends(container)):
+    await c.users.delete(p.actor, user_id)
+    return {"ok": True}

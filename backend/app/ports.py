@@ -18,10 +18,6 @@ class SecretStore(ABC):
     @abstractmethod
     async def healthy(self) -> bool: ...
 
-    async def keys(self, prefix: str) -> list[str]:
-        """The names right under a folder (``users/`` → ``["1/", "2/"]``); stores that cannot list return none."""
-        return []
-
 
 class CommandRunner(ABC):
     @abstractmethod

@@ -8,7 +8,6 @@ from ..domain.errors import ExternalServiceError
 from ..domain.models import PeerEntry, PeerRuntime
 from ..ports import CommandRunner
 
-# Router-side marker kept from the Amnezia Control era: existing WireGuard objects are found by it.
 COMMENT = "amnezia-control"
 _KEY = re.compile(r"[A-Za-z0-9+/]{42,43}=")
 _UNITS = {"w": 604800, "d": 86400, "h": 3600, "m": 60, "s": 1, "ms": 0}

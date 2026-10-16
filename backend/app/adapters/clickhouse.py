@@ -24,11 +24,11 @@ class ClickHouseClient:
         try:
             r = await self._http.post("/", params=query, content=content)
         except httpx.HTTPError as e:
-            raise ExternalServiceError(f"ClickHouse is unreachable: {e}") from e
+            raise ExternalServiceError(f"ClickHouse недоступен: {e}") from e
         if r.status_code != 200:
             msg = " ".join(r.text.split())[:600]
             if "SYNTAX_ERROR" in msg or "Code: 62" in msg or "Code: 47" in msg:
-                raise DomainError(f"Query error: {msg}")
+                raise DomainError(f"Ошибка запроса: {msg}")
             raise ExternalServiceError(f"ClickHouse: {msg}")
         return r
 

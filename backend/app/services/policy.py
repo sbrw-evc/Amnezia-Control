@@ -35,12 +35,12 @@ class PolicyEnforcer:
             try:
                 if c.status == ClientStatus.ACTIVE and expired:
                     await self._clients.set_blocked(Actor.system(), c.id, True, BlockReason.EXPIRED)
-                    await self._alerts.raise_(f"client.expired.{c.id}", Severity.INFO, f"Access expired: {c.name}",
-                                              "The client was blocked automatically", str(c.id))
+                    await self._alerts.raise_(f"client.expired.{c.id}", Severity.INFO, f"Срок доступа истёк: {c.name}",
+                                              "Клиент автоматически заблокирован", str(c.id))
                 elif c.status == ClientStatus.ACTIVE and over:
                     await self._clients.set_blocked(Actor.system(), c.id, True, BlockReason.QUOTA)
-                    await self._alerts.raise_(f"client.quota.{c.id}", Severity.WARNING, f"Quota exhausted: {c.name}",
-                                              "The client is blocked until the start of next month", str(c.id))
+                    await self._alerts.raise_(f"client.quota.{c.id}", Severity.WARNING, f"Квота исчерпана: {c.name}",
+                                              "Клиент заблокирован до начала следующего месяца", str(c.id))
                 elif c.status == ClientStatus.BLOCKED and c.block_reason == BlockReason.QUOTA and not over and not expired:
                     await self._clients.set_blocked(Actor.system(), c.id, False)
                     await self._alerts.resolve(f"client.quota.{c.id}")
@@ -54,13 +54,13 @@ class PolicyEnforcer:
                 if c.quota_bytes and not over and used * 100 >= c.quota_bytes * st["quota_warn_percent"]:
                     key = f"client.quota_warn.{c.id}"
                     warn_keys.add(key)
-                    await self._alerts.raise_(key, Severity.WARNING, f"Quota almost exhausted: {c.name}",
-                                              f"{used * 100 // c.quota_bytes}% of the monthly quota used", str(c.id))
+                    await self._alerts.raise_(key, Severity.WARNING, f"Квота почти исчерпана: {c.name}",
+                                              f"Использовано {used * 100 // c.quota_bytes}% месячной квоты", str(c.id))
                 if c.expires_at and not expired and c.expires_at - now <= dt.timedelta(days=st["expiry_warn_days"]):
                     key = f"client.expiring.{c.id}"
                     warn_keys.add(key)
-                    await self._alerts.raise_(key, Severity.INFO, f"Access expires soon: {c.name}",
-                                              f"Until {c.expires_at.astimezone(ZoneInfo(st['timezone'])).strftime('%d.%m.%Y %H:%M')}",
+                    await self._alerts.raise_(key, Severity.INFO, f"Скоро истекает доступ: {c.name}",
+                                              f"До {c.expires_at.astimezone(ZoneInfo(st['timezone'])).strftime('%d.%m.%Y %H:%M')}",
                                               str(c.id))
         await self._alerts.resolve_prefix_except("client.quota_warn.", warn_keys)
         await self._alerts.resolve_prefix_except("client.expiring.", warn_keys)

@@ -3,12 +3,11 @@ uvicorn[standard]==0.34.0
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
 httpx==0.28.1
+argon2-cffi==23.1.0
+pyotp==2.9.0
 cryptography==44.0.0
-PyJWT[crypto]==2.10.1
 qrcode==8.0
 maxminddb==2.6.2
 pydantic-settings==2.7.0
 python-multipart==0.0.20
 tzdata==2024.2
-asyncssh==2.19.0
-pysnmp==7.1.30

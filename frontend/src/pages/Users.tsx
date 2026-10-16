@@ -1,63 +1,116 @@
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Info, UserCog } from "lucide-react";
+import { KeyRound, Plus, ShieldCheck, ShieldOff, Trash2, UserCog } from "lucide-react";
+import { useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { Fmt, ROLE_LABEL } from "@/lib/format";
+import { useAction } from "@/lib/hooks";
+import type { PanelUser, Role } from "@/lib/types";
 import { useAuth } from "@/store/auth";
-import { Badge, Card, Page, PageHeader } from "@/components/ui/Primitives";
-import { EmptyState, Skeleton } from "@/components/ui/Feedback";
+import { Badge, Card, Field, Modal, Page, PageHeader } from "@/components/ui/Primitives";
+import { Skeleton } from "@/components/ui/Feedback";
+import { confirm } from "@/components/ui/Confirm";
 import ApiTokens from "@/components/admin/ApiTokens";
-import SpaConnection from "@/components/admin/SpaConnection";
-import { t } from "@/i18n";
+import { Radio, Select } from "@/components/ui/Controls";
 
-/** People who may use Network Control: read-only records synchronised from SPA, plus the API tokens. */
+const ROLES: { value: Role; hint: string }[] = [
+  { value: "admin", hint: "всё, включая сервер, маршрутизацию, операторов и аудит" },
+  { value: "operator", hint: "создание, блокировка и выдача конфигов клиентам" },
+  { value: "viewer", hint: "только просмотр мониторинга и аналитики" },
+];
+
+function genPassword() {
+  const a = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  return Array.from(crypto.getRandomValues(new Uint32Array(16)), (n) => a[n % a.length]).join("");
+}
+
 export default function Users() {
   const me = useAuth((s) => s.user);
   const users = useQuery({ queryKey: ["users"], queryFn: () => api.users.list() });
-  const spa = useQuery({ queryKey: ["spa"], queryFn: () => api.users.spa() });
-  const issuer = spa.data?.issuer;
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ username: "", display_name: "", role: "operator" as Role, password: genPassword() });
+  const inv = { invalidate: [["users"]] };
+  const create = useAction((d: typeof form) => api.users.create(d), { ...inv, success: "Оператор добавлен", onSuccess: () => setCreating(false) });
+  const update = useAction(({ id, d }: { id: number; d: Partial<PanelUser> }) => api.users.update(id, d), { ...inv, success: "Сохранено" });
+  const reset = useAction(({ id, pw }: { id: number; pw: string }) => api.users.resetPassword(id, pw), { ...inv, success: "Пароль сброшен, сессии завершены" });
+  const totpOff = useAction((id: number) => api.users.disableTotp(id), { ...inv, success: "2FA отключена" });
+  const remove = useAction((id: number) => api.users.remove(id), { ...inv, success: "Оператор удалён" });
+
+  const submit = (e: FormEvent) => { e.preventDefault(); create.mutate(form); };
 
   return (
     <Page>
-      <PageHeader title={t("Users and access")} icon={<UserCog size={20} />}
-        subtitle={t("People, their roles and sign-in are managed in SPA; Network Control synchronises them every 5 minutes.")}
-        actions={issuer && (
-          <a className="btn-ghost" href={issuer} target="_blank" rel="noreferrer"><ExternalLink size={15} /> {t("Manage in SPA")}</a>
-        )} />
-
-      <div className="flex items-start gap-3 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
-        <Info size={18} className="mt-0.5 shrink-0" />
-        <div>{t("Creating users, passwords, passkeys, roles and enabling or disabling people are managed in SPA. A person disabled in SPA loses their sessions and API tokens here at the next synchronization.")}</div>
-      </div>
-
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Card bodyClass="p-0">
-          <table className="table-nc">
-            <thead><tr><th>{t("User")}</th><th>{t("Role")}</th><th>{t("Groups")}</th><th>{t("Status")}</th><th>{t("Last sign-in")}</th></tr></thead>
-            <tbody>
-              {users.isLoading && <tr><td colSpan={5}><Skeleton className="h-24" /></td></tr>}
-              {users.data?.map((u) => (
-                <tr key={u.id} className={u.is_active ? undefined : "opacity-60"}>
-                  <td>
-                    <div className="font-medium text-slate-100">{u.display_name || u.username} {u.id === me?.id && <Badge tone="blue">{t("you")}</Badge>}</div>
-                    <div className="mono text-slate-500">{u.username}{u.email && <span className="text-slate-600"> · {u.email}</span>}</div>
-                  </td>
-                  <td><Badge tone={u.role === "admin" ? "red" : u.role === "operator" ? "amber" : "blue"}>{t(ROLE_LABEL[u.role])}</Badge></td>
-                  <td className="text-xs text-slate-400">{u.groups.length ? u.groups.join(", ") : "—"}</td>
-                  <td className="space-x-1">
-                    {u.is_active ? <Badge tone="green">{t("active")}</Badge> : <Badge tone="red">{t("disabled")}</Badge>}
-                    {!u.external_id && <Badge tone="amber">{t("not in SPA")}</Badge>}
-                  </td>
-                  <td className="text-xs text-slate-400">{Fmt.ago(u.last_login_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {users.data && !users.data.length && <EmptyState title={t("No users yet")} hint={t("They appear after the first synchronization with SPA")} />}
-        </Card>
-        <SpaConnection />
-      </div>
+      <PageHeader title="Доступ к панели" icon={<UserCog size={20} />} subtitle="Операторы панели и их роли. Пароли хранятся как argon2-хеши, секреты 2FA — в OpenBao."
+        actions={<button className="btn-primary" onClick={() => { setForm({ username: "", display_name: "", role: "operator", password: genPassword() }); setCreating(true); }}><Plus size={16} /> Добавить</button>} />
+      <Card bodyClass="p-0">
+        <table className="table-ac">
+          <thead><tr><th>Пользователь</th><th>Роль</th><th>Статус</th><th>2FA</th><th>Последний вход</th><th /></tr></thead>
+          <tbody>
+            {users.isLoading && <tr><td colSpan={6}><Skeleton className="h-24" /></td></tr>}
+            {users.data?.map((u) => (
+              <tr key={u.id}>
+                <td>
+                  <div className="font-medium text-slate-100">{u.display_name || u.username} {u.id === me?.id && <Badge tone="blue">вы</Badge>}</div>
+                  <div className="mono text-slate-500">{u.username}</div>
+                </td>
+                <td>
+                  <div className="w-[170px]">
+                    <Select size="sm" value={u.role} disabled={u.id === me?.id}
+                      onChange={(v: Role) => update.mutate({ id: u.id, d: { role: v } })}
+                      options={ROLES.map((r) => ({ value: r.value, label: ROLE_LABEL[r.value] }))} />
+                  </div>
+                </td>
+                <td className="space-x-1">
+                  {u.is_active ? <Badge tone="green">активен</Badge> : <Badge tone="red">отключён</Badge>}
+                  {u.must_change_password && <Badge tone="amber">смена пароля</Badge>}
+                  {u.locked && <Badge tone="red">блок. после попыток</Badge>}
+                </td>
+                <td>{u.totp_enabled ? <Badge tone="green"><ShieldCheck size={10} /> вкл</Badge> : <Badge>выкл</Badge>}</td>
+                <td className="text-xs text-slate-400">{Fmt.ago(u.last_login_at)}</td>
+                <td>
+                  {u.id !== me?.id && (
+                    <div className="flex justify-end gap-1">
+                      <button className="btn-ghost btn-sm" onClick={() => update.mutate({ id: u.id, d: { is_active: !u.is_active } })}>{u.is_active ? "Отключить" : "Включить"}</button>
+                      <button className="btn-ghost btn-sm" title="Сбросить пароль" onClick={async () => {
+                        const pw = genPassword();
+                        if (await confirm({ title: "Сбросить пароль?", message: `Новый временный пароль для ${u.username}: ${pw}\nСкопируйте его — после подтверждения он больше не будет показан. Пользователь сменит его при входе.`, confirmLabel: "Сбросить" }))
+                          reset.mutate({ id: u.id, pw });
+                      }}><KeyRound size={14} /></button>
+                      {u.totp_enabled && <button className="btn-ghost btn-sm" title="Отключить 2FA" onClick={() => totpOff.mutate(u.id)}><ShieldOff size={14} /></button>}
+                      <button className="btn-danger btn-sm" onClick={async () => {
+                        if (await confirm({ title: "Удалить оператора?", message: `${u.username} потеряет доступ к панели.`, danger: true, confirmLabel: "Удалить" })) remove.mutate(u.id);
+                      }}><Trash2 size={14} /></button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
 
       <ApiTokens />
+
+      <Modal open={creating} onClose={() => setCreating(false)} title="Новый оператор">
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Логин"><input className="input" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></Field>
+            <Field label="Имя"><input className="input" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></Field>
+          </div>
+          <Field label="Роль">
+            <div className="space-y-2" role="radiogroup">
+              {ROLES.map((r) => (
+                <Radio key={r.value} checked={form.role === r.value} onChange={() => setForm({ ...form, role: r.value })}
+                  label={ROLE_LABEL[r.value]} hint={r.hint} />
+              ))}
+            </div>
+          </Field>
+          <Field label="Временный пароль" hint="пользователь сменит его при первом входе">
+            <div className="flex gap-2"><input className="input mono" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              <button type="button" className="btn-ghost" onClick={() => setForm({ ...form, password: genPassword() })}>↻</button></div>
+          </Field>
+          <div className="flex justify-end"><button className="btn-primary" disabled={create.isPending}>Создать</button></div>
+        </form>
+      </Modal>
     </Page>
   );
 }

@@ -35,9 +35,9 @@ class SiteListCompiler:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
-            raise DomainError(f"The file is not JSON: {e}")
+            raise DomainError(f"Файл не является JSON: {e}")
         if not isinstance(data, dict):
-            raise DomainError("Expected an object {site: {...}}")
+            raise DomainError("Ожидается объект {сайт: {...}}")
         nets, groups, per_site = [], Counter(), []
         for key, site in data.items():
             if not isinstance(site, dict):
@@ -87,19 +87,19 @@ class RoutingService:
     async def monitor(self) -> None:
         st = await self.status()
         if not st["reachable"]:
-            await self._alerts.raise_("router.unreachable", Severity.WARNING, "Router is unreachable over SSH", st["error"])
+            await self._alerts.raise_("router.unreachable", Severity.WARNING, "Роутер недоступен по SSH", st["error"])
             return
         await self._alerts.resolve("router.unreachable")
         if st.get("tunnel_active"):
             await self._alerts.resolve("router.tunnel_down")
         else:
-            await self._alerts.raise_("router.tunnel_down", Severity.CRITICAL, "Tunnel on the router is down",
-                                      "Sites from the list go directly through the ISP (fallback route)")
+            await self._alerts.raise_("router.tunnel_down", Severity.CRITICAL, "Туннель на роутере неактивен",
+                                      "Сайты из списка идут напрямую через провайдера (резервный маршрут)")
 
     async def apply_site_list(self, actor: Actor, raw: bytes) -> dict:
         cidrs, summary, per_site = await asyncio.to_thread(self._compiler.compile, raw)
         if not cidrs:
-            raise DomainError("The file has no IPv4 addresses")
+            raise DomainError("В файле нет ни одного IPv4-адреса")
         customs = await self.custom_list()
         count = await self._router.replace_address_list(sorted(set(cidrs) | {c["cidr"] for c in customs}))
         self._list_cache = None
@@ -148,21 +148,21 @@ class RoutingService:
             net = None
         if net is not None:
             if net.version != 4 or any(net.overlaps(e) for e in EXCLUDE):
-                raise DomainError("Only public IPv4 addresses are allowed")
+                raise DomainError("Допустимы только публичные IPv4-адреса")
             return str(net), "prefix", []
         host = self._host(target)
         if not HOST_RE.fullmatch(host):
-            raise DomainError("Enter a domain (example.com), an IPv4 address or a subnet (203.0.113.0/24)")
+            raise DomainError("Укажите домен (example.com), IPv4-адрес или подсеть (203.0.113.0/24)")
         ips = await self._public_ips(host)
         if not ips:
-            raise DomainError(f"{host} points only to local addresses and cannot be routed through the VPN")
+            raise DomainError(f"{host} указывает только на локальные адреса — через VPN его не направить")
         return host, "domain", ips
 
     async def add_custom(self, actor: Actor, target: str, comment: str) -> dict:
         cidr, kind, ips = await self._parse_target(target)
         items = await self.custom_list()
         if any(i["cidr"] == cidr for i in items):
-            raise DomainError("This address is already added")
+            raise DomainError("Такой адрес уже добавлен")
         await self._router.add_address(cidr)
         item = {"cidr": cidr, "kind": kind, "comment": comment.strip()[:128], "added_by": actor.username,
                 "added_at": utcnow().isoformat()}
@@ -206,7 +206,7 @@ class RoutingService:
         items = await self.custom_list()
         item = next((i for i in items if i["cidr"] == cidr), None)
         if not item:
-            raise DomainError("Address not found")
+            raise DomainError("Адрес не найден")
         await self._router.remove_address(cidr)
         await self._save_custom([i for i in items if i["cidr"] != cidr])
         self._list_cache = None
@@ -238,13 +238,13 @@ class RoutingService:
                 infos = await asyncio.to_thread(socket.getaddrinfo, name, 443, socket.AF_INET, socket.SOCK_STREAM)
                 ips = {i[4][0] for i in infos}
             except socket.gaierror:
-                raise DomainError(f"Could not resolve {name}")
+                raise DomainError(f"Не удалось разрешить {name}")
         return sorted(ips)
 
     async def check(self, target: str) -> dict:
         target = self._host(target)
         if not target:
-            raise DomainError("Enter a domain or an IP address")
+            raise DomainError("Укажите домен или IP")
         try:
             ips = [str(ipaddress.ip_address(target))]
         except ValueError:

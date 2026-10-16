@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { notify } from "./notify";
-import { t } from "@/i18n";
 
 export function useAction<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>, opts: {
   success?: string | ((r: TResult) => string);
@@ -15,15 +14,15 @@ export function useAction<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>,
       opts.invalidate?.forEach((k) => qc.invalidateQueries({ queryKey: k }));
       opts.onSuccess?.(r);
     },
-    onError: (e: Error) => notify.error(t("Action failed"), e.message),
+    onError: (e: Error) => notify.error("Действие не выполнено", e.message),
   });
 }
 
-export async function copyText(text: string, label = t("Copied")) {
+export async function copyText(text: string, label = "Скопировано") {
   try {
     await navigator.clipboard.writeText(text);
     notify.success(label);
   } catch {
-    notify.error(t("Clipboard is not available"), t("HTTPS or localhost is required"));
+    notify.error("Буфер обмена недоступен", "Нужен HTTPS или localhost");
   }
 }

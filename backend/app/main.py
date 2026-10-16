@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from .api import routes_admin, routes_auth, routes_clients, routes_devices, routes_flows, routes_onboarding, routes_ops
+from .api import routes_admin, routes_auth, routes_clients, routes_flows, routes_ops
 from .config import get_settings
 from .container import Container
 from .domain.errors import DomainError
@@ -13,7 +13,7 @@ from .domain.errors import DomainError
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-VERSION = "2.0.0"
+VERSION = "1.0.0"
 
 
 @asynccontextmanager
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     await c.stop()
 
 
-app = FastAPI(title="Network Control", version=VERSION, lifespan=lifespan, docs_url="/api/docs", redoc_url=None,
+app = FastAPI(title="Amnezia Control", version=VERSION, lifespan=lifespan, docs_url="/api/docs", redoc_url=None,
               openapi_url="/api/openapi.json")
 
 
@@ -43,7 +43,7 @@ async def value_error(_: Request, e: ValueError):
 async def validation_error(_: Request, e: RequestValidationError):
     first = e.errors()[0] if e.errors() else {}
     field = ".".join(str(x) for x in first.get("loc", [])[1:])
-    return JSONResponse({"detail": f"Invalid field {field}: {first.get('msg', '')}"}, status_code=422)
+    return JSONResponse({"detail": f"Некорректное поле {field}: {first.get('msg', '')}"}, status_code=422)
 
 
 @app.get("/api/health")
@@ -52,5 +52,5 @@ async def health():
 
 
 for r in (routes_auth.router, routes_clients.router, routes_clients.public, routes_ops.router, routes_admin.router,
-          routes_flows.router, routes_devices.router, routes_onboarding.router):
+          routes_flows.router):
     app.include_router(r)

@@ -64,14 +64,14 @@ class AmneziaBackend(VpnBackend):
         async with self._editor.edit() as cfg:
             peer = cfg.peer(public_key)
             if not peer:
-                raise NotFound("Peer not found in the server config; run a sync")
+                raise NotFound("Пир не найден в конфиге сервера — выполните синхронизацию")
             peer.disabled = disabled
 
     async def rekey_peer(self, old_key: str, new_key: str) -> None:
         async with self._editor.edit() as cfg:
             peer = cfg.peer(old_key)
             if not peer:
-                raise NotFound("Peer not found in the server config")
+                raise NotFound("Пир не найден в конфиге сервера")
             peer.lines = [f"PublicKey = {new_key}" if l.strip().startswith("PublicKey") else l for l in peer.lines]
             peer.public_key = new_key
         table = await self._gw.read_clients_table()
@@ -121,7 +121,7 @@ class MikrotikBackend(VpnBackend):
 
     async def add_peer(self, public_key: str, name: str) -> NewPeer:
         if not await self.ready():
-            raise DomainError("WireGuard on MikroTik is not set up; set it up on the 'VPN on MikroTik' page")
+            raise DomainError("WireGuard на MikroTik не настроен — выполните настройку на странице «VPN на MikroTik»")
         psk = generate_psk()
         async with self._lock.hold():
             taken = [f"{self.wg.server_ip}/32"] + [p["address"] for p in await self.wg.peers()]
@@ -144,7 +144,7 @@ class MikrotikBackend(VpnBackend):
     async def endpoint(self) -> tuple[str, int]:
         iface = await self.wg.interface()
         if not iface:
-            raise DomainError("WireGuard on MikroTik is not set up")
+            raise DomainError("WireGuard на MikroTik не настроен")
         host = await self._settings.get("mt_endpoint_host") or await self.wg.public_address()
         return host, iface["listen_port"]
 
