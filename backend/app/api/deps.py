@@ -8,8 +8,8 @@ from ..domain.errors import Forbidden, Unauthorized
 from ..domain.models import Role
 from ..services.common import Actor
 
-COOKIE = "ac_session"
-CSRF_HEADER = "amnezia-control"
+COOKIE = "nc_session"
+CSRF_HEADER = "network-control"
 
 
 def container(request: Request) -> Container:
@@ -27,34 +27,31 @@ class Principal:
     user: PanelUser | None = None
     session: PanelSession | None = None
     token: str | None = None
-    must_change_password: bool = False
+    owner_id: int | None = None
 
 
 async def current(request: Request, c: Container = Depends(container)) -> Principal:
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
         t = await c.tokens.authenticate(auth[7:].strip())
-        return Principal(Actor(f"token:{t.name}", t.role.value, client_ip(request)), t.role)
+        return Principal(Actor(f"token:{t.token.name}", t.role.value, client_ip(request)), t.role, owner_id=t.owner.id)
     if request.method not in ("GET", "HEAD") and request.headers.get("x-requested-with") != CSRF_HEADER:
         raise Forbidden("CSRF check failed")
     token = request.cookies.get(COOKIE)
     user, sess = await c.auth.authenticate(token)
-    return Principal(Actor(user.username, user.role.value, client_ip(request)), user.role, user, sess, token,
-                     user.must_change_password)
+    return Principal(Actor(user.username, user.role.value, client_ip(request)), user.role, user, sess, token, user.id)
 
 
 async def session_user(p: Principal = Depends(current)) -> Principal:
     if p.user is None:
-        raise Forbidden("Доступно только для входа через браузер")
+        raise Forbidden("Available only when signed in through the browser")
     return p
 
 
 def require(role: Role):
     async def dep(p: Principal = Depends(current)) -> Principal:
-        if p.must_change_password and role != Role.VIEWER:
-            raise Forbidden("Сначала смените пароль")
         if not p.role.allows(role):
-            raise Forbidden("Недостаточно прав")
+            raise Forbidden("Not enough rights")
         return p
     return dep
 

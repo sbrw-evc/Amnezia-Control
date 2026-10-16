@@ -14,15 +14,7 @@ cleanup() {
   ip rule del iif "$LAN_IF" lookup $TABLE 2>/dev/null
   iptables -t nat -D POSTROUTING -o $IF -j MASQUERADE 2>/dev/null
   iptables -t mangle -D FORWARD -o $IF -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
-  forwards -D
   awg-quick down "$CONF" 2>/dev/null
-}
-
-forwards() {
-  for f in ${PORT_FORWARDS:-}; do
-    iptables -t nat "$1" PREROUTING -i "$LAN_IF" -m addrtype --dst-type LOCAL -p tcp --dport "${f%%=*}" \
-      -j DNAT --to-destination "${f#*=}" 2>/dev/null
-  done
 }
 trap 'cleanup; exit 0' TERM INT
 
@@ -42,7 +34,6 @@ iptables -I $FWD 1 -i "$LAN_IF" -o $IF -j ACCEPT
 iptables -I $FWD 1 -i $IF -o "$LAN_IF" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 iptables -t nat -A POSTROUTING -o $IF -j MASQUERADE
 iptables -t mangle -A FORWARD -o $IF -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-forwards -A
 
 echo "awg0 up"; awg show $IF
 while true; do sleep 30 & wait $!; ip link show $IF >/dev/null 2>&1 || { echo "awg0 gone"; cleanup; exit 1; }; done

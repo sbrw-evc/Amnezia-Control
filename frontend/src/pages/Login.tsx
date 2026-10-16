@@ -1,45 +1,83 @@
-import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
-import { notify } from "@/lib/notify";
-import PasswordInput from "@/components/ui/PasswordInput";
-import { Activity, KeyRound, Loader2, LogIn, ShieldCheck } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { Activity, AlertTriangle, ExternalLink, KeyRound, Loader2, LogIn, PlugZap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
-import { useAuth } from "@/store/auth";
+import { clearSignedOut, useAuth, wasSignedOut } from "@/store/auth";
+import { t, tServer } from "@/i18n";
+
+export const SPA_PROTOCOL_URL = "https://github.com/sbrw-evc/SPA-Single-point-of-authorization-/blob/main/docs/protocol.md";
+
+/** Messages for the `sso_error` codes the callback sends back here. */
+function errorText(code: string, description: string | null): { title: string; detail: string | null } {
+  if (code === "access_denied")
+    return { title: t("You have no role in Network Control. Ask an SPA administrator for access."), detail: null };
+  if (code === "invalid_state")
+    return { title: t("The sign-in took too long or was started in another browser. Try again."), detail: null };
+  if (code === "unavailable") return { title: t("SPA is not available"), detail: description ? tServer(description) : null };
+  return { title: t("Sign-in failed"), detail: description ? tServer(description) : code };
+}
+
+/** How to connect Network Control to SPA (shown while it is not connected). */
+export function ConnectInstructions({ error }: { error?: string | null }) {
+  const origin = window.location.origin;
+  return (
+    <div className="space-y-3 text-sm text-slate-300">
+      {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-red-200">{tServer(error)}</div>}
+      <ol className="list-decimal space-y-2 pl-5">
+        <li>
+          {t("In SPA, open Applications → Connect an application, choose the type Network Control and enter the address of this application:")}{" "}
+          <code className="mono break-all text-slate-100">{origin}</code>
+          <div className="mt-1 text-xs text-slate-500">{t("Redirect address:")} <code className="mono break-all">{origin}/api/auth/spa/callback</code></div>
+        </li>
+        <li>
+          {t("Give the roles Administrator, Operator or Viewer to people or groups.")}
+          <div className="mt-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            {t("Give yourself the Administrator role before you connect: the first synchronization disables the old local admin and every user SPA does not list.")}
+          </div>
+        </li>
+        <li>
+          {t("Put the connection key (spa1.…) into SPA_CONNECTION_KEY in .env — or into the file named by SPA_CONNECTION_KEY_FILE, or the OpenBao secret spa/connection_key — and restart Network Control.")}
+        </li>
+      </ol>
+      <a className="inline-flex items-center gap-1.5 text-accent hover:underline" href={SPA_PROTOCOL_URL} target="_blank" rel="noreferrer">
+        {t("How applications connect to SPA")} <ExternalLink size={13} />
+      </a>
+    </div>
+  );
+}
 
 export default function LoginPage() {
-  const { user, ready, setUser } = useAuth();
-  const nav = useNavigate();
-  const from = (useLocation().state as { from?: string } | null)?.from ?? "/";
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [step, setStep] = useState<"password" | "totp">("password");
-  const [busy, setBusy] = useState(false);
-  const shake = useAnimationControls();
+  const { user, ready } = useAuth();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const from = (location.state as { from?: string } | null)?.from ?? "/";
+  const error = params.get("sso_error");
+  const description = params.get("sso_error_description");
+  const config = useQuery({ queryKey: ["auth-config"], queryFn: () => api.auth.config(), retry: 1, refetchOnWindowFocus: false });
+  const [signedOut] = useState(wasSignedOut);
+  const [going, setGoing] = useState(false);
+  const connected = !!config.data?.connected;
+  const auto = ready && !user && connected && !error && !signedOut;
+
+  const go = (again = false) => {
+    clearSignedOut();
+    setGoing(true);
+    window.location.assign(api.auth.startUrl(from, again ? { prompt: "login" } : {}));
+  };
+
+  useEffect(() => {
+    if (auto) {
+      setGoing(true);
+      window.location.replace(api.auth.startUrl(from));
+    }
+  }, [auto, from]);
 
   if (ready && user) return <Navigate to={from} replace />;
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      if (step === "password") {
-        const r = await api.auth.login(username.trim(), password);
-        if (r.requires_2fa) { setStep("totp"); return; }
-        setUser(r.user);
-      } else {
-        const r = await api.auth.verify2fa(code);
-        setUser(r.user);
-      }
-      nav(from, { replace: true });
-    } catch (err) {
-      notify.error("Не удалось войти", err instanceof Error ? err.message : "Ошибка входа");
-      shake.start({ x: [0, -10, 10, -6, 6, 0], transition: { duration: 0.4 } });
-    } finally {
-      setBusy(false);
-    }
-  };
+  const failure = error && error !== "not_connected" ? errorText(error, description) : null;
+  const notConnected = config.isSuccess && !connected;
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
@@ -48,50 +86,59 @@ export default function LoginPage() {
       <motion.div className="absolute -bottom-40 -right-40 h-[480px] w-[480px] rounded-full bg-indigo-600/20 blur-3xl"
         animate={{ x: [0, -50, 0], y: [0, -30, 0] }} transition={{ duration: 16, repeat: Infinity }} />
 
-      <motion.div animate={shake} className="relative w-full max-w-sm">
-      <motion.form onSubmit={submit} initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 200, damping: 22 }} className="card relative w-full p-7 shadow-2xl">
+      <motion.div initial={{ opacity: 0, y: 20, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 22 }}
+        className={`card relative w-full p-7 shadow-2xl ${notConnected ? "max-w-lg" : "max-w-sm"}`}>
         <div className="mb-6 flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-glow">
             <Activity className="text-white" size={22} />
           </div>
           <div>
-            <div className="text-lg font-semibold text-white">Amnezia Control</div>
-            <div className="text-xs text-slate-400">Панель управления VPN</div>
+            <div className="text-lg font-semibold text-slate-100">Network Control</div>
+            <div className="text-xs text-slate-400">{t("VPN and network control panel")}</div>
           </div>
         </div>
 
-        <AnimatePresence mode="wait">
-          {step === "password" ? (
-            <motion.div key="pw" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-3">
+        {config.isLoading || (auto && !failure) ? (
+          <div className="flex items-center gap-2 py-6 text-sm text-slate-400">
+            <Loader2 size={16} className="animate-spin" /> {t("Going to SPA to sign in…")}
+          </div>
+        ) : config.isError ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-2 text-sm text-red-300"><AlertTriangle size={16} className="mt-0.5 shrink-0" /> {t("Network Control is not available. Try again in a minute.")}</div>
+            <button className="btn-ghost w-full" onClick={() => config.refetch()}>{t("Try again")}</button>
+          </div>
+        ) : notConnected ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-2.5">
+              <PlugZap size={18} className="mt-0.5 shrink-0 text-amber-400" />
               <div>
-                <label className="label" htmlFor="u">Логин</label>
-                <input id="u" className="input" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+                <div className="font-semibold text-slate-100">{t("This application is not connected to SPA")}</div>
+                <div className="mt-1 text-sm text-slate-400">{t("Sign-in and access to Network Control are managed in SPA — Single Point of Authorization. To connect:")}</div>
               </div>
-              <div>
-                <label className="label" htmlFor="p">Пароль</label>
-                <PasswordInput id="p" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <ConnectInstructions error={config.data?.error} />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {failure && (
+              <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm text-red-200">
+                <div className="flex items-start gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0" /> {failure.title}</div>
+                {failure.detail && <div className="mt-1 pl-6 text-xs text-red-300/80">{failure.detail}</div>}
               </div>
-            </motion.div>
-          ) : (
-            <motion.div key="totp" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-slate-300"><ShieldCheck size={16} className="text-emerald-400" /> Введите код из приложения-аутентификатора</div>
-              <input className="input text-center font-mono text-2xl tracking-[.5em]" inputMode="numeric" autoFocus maxLength={6}
-                value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <button type="submit" className="btn-primary mt-5 w-full py-2.5" disabled={busy || (step === "password" ? !password : code.length < 6)}>
-          {busy ? <Loader2 size={16} className="animate-spin" /> : step === "password" ? <LogIn size={16} /> : <KeyRound size={16} />}
-          {step === "password" ? "Войти" : "Подтвердить"}
-        </button>
-        {step === "totp" && (
-          <button type="button" className="mt-2 w-full text-xs text-slate-500 hover:text-slate-300" onClick={() => { setStep("password"); setCode(""); }}>
-            ← Назад
-          </button>
+            )}
+            {!failure && signedOut && <p className="text-sm text-slate-400">{t("You have signed out.")}</p>}
+            <button type="button" className="btn-primary w-full py-2.5" disabled={going} onClick={() => go()}>
+              {going ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />} {t("Sign in with SPA")}
+            </button>
+            {failure && error === "access_denied" && (
+              <button type="button" className="btn-ghost w-full" disabled={going} onClick={() => go(true)}>
+                <KeyRound size={15} /> {t("Sign in as another person")}
+              </button>
+            )}
+            <p className="text-center text-xs text-slate-500">{t("Passwords, passkeys and two-factor authentication are managed in SPA.")}</p>
+          </div>
         )}
-      </motion.form>
       </motion.div>
     </div>
   );

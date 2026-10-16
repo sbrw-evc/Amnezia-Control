@@ -7,11 +7,13 @@ import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { api } from "@/lib/api";
 import { Fmt, REASON_LABEL } from "@/lib/format";
+import { k, t, tn } from "@/i18n";
 import Flag from "@/components/ui/Flag";
 import { useAction } from "@/lib/hooks";
 import { SERVER_LABEL, type ServerKind, type VpnClient } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { Badge, Modal, Page, PageHeader, StatusDot, UsageBar } from "@/components/ui/Primitives";
+import { SetupGuide } from "@/components/onboarding/Steps";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/Feedback";
 import { confirm } from "@/components/ui/Confirm";
 import { Checkbox } from "@/components/ui/Controls";
@@ -20,21 +22,22 @@ import ConfigModal from "@/components/clients/ConfigModal";
 import { useClientActions } from "@/components/clients/useClientActions";
 
 type Filter = "all" | "online" | "active" | "blocked" | "missing" | "unmanaged";
+/** Labels are English keys, drawn with t(). */
 const FILTERS: { value: Filter; label: string; test: (c: VpnClient) => boolean }[] = [
-  { value: "all", label: "Все", test: () => true },
-  { value: "online", label: "Онлайн", test: (c) => c.online },
-  { value: "active", label: "Активные", test: (c) => c.status === "active" },
-  { value: "blocked", label: "Заблокированы", test: (c) => c.status === "blocked" },
-  { value: "missing", label: "Удалены на сервере", test: (c) => c.status === "missing" },
-  { value: "unmanaged", label: "Без ключа в панели", test: (c) => !c.managed },
+  { value: "all", label: k("All"), test: () => true },
+  { value: "online", label: k("Online"), test: (c) => c.online },
+  { value: "active", label: k("Active only"), test: (c) => c.status === "active" },
+  { value: "blocked", label: k("Blocked clients"), test: (c) => c.status === "blocked" },
+  { value: "missing", label: k("Missing on the server"), test: (c) => c.status === "missing" },
+  { value: "unmanaged", label: k("No key in the panel"), test: (c) => !c.managed },
 ];
 type SortKey = "name" | "month" | "total" | "handshake" | "rate";
 
 function exportCsv(clients: VpnClient[]) {
-  const head = ["Сервер", "Имя", "Владелец", "Контакт", "Теги", "Адрес", "Статус", "Онлайн", "Месяц, байт", "Всего, байт", "Квота, байт",
-    "Доступ до", "Страна", "Город", "Последний handshake", "Создан"];
+  const head = [t("Server"), t("Client name"), t("Owner"), t("Contact"), t("Tags"), t("Address"), t("Status"), t("Online"), t("Month, bytes"),
+    t("Total, bytes"), t("Quota, bytes"), t("Access until"), t("Country"), t("City"), t("Last handshake"), t("Created")];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = clients.map((c) => [SERVER_LABEL[c.server], c.name, c.owner, c.contact, c.tags.join(" "), c.address, c.status, c.online ? "да" : "нет",
+  const lines = clients.map((c) => [SERVER_LABEL[c.server], c.name, c.owner, c.contact, c.tags.join(" "), c.address, c.status, c.online ? t("yes") : t("no"),
     c.month_rx + c.month_tx, c.total_rx + c.total_tx, c.quota_bytes ?? "", c.expires_at ?? "", c.country ?? "", c.city ?? "",
     c.last_handshake_at ?? "", c.created_at ?? ""].map(esc).join(";"));
   const blob = new Blob(["﻿" + [head.map(esc).join(";"), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
@@ -64,14 +67,16 @@ export default function Clients() {
   const servers = useQuery({ queryKey: ["vpn-servers"], queryFn: () => api.clients.servers(), staleTime: 30_000 });
   const actions = useClientActions();
   const create = useAction(api.clients.create.bind(api.clients), {
-    success: "Клиент создан", invalidate: [["clients"], ["summary"]],
+    success: t("Client created"), invalidate: [["clients"], ["summary"]],
     onSuccess: (c) => { setCreating(false); setConfigFor(c.id); },
   });
   const sync = useAction(() => api.clients.sync(), {
-    success: (r) => `Синхронизировано: пиров ${r.peers}, импортировано ${r.imported}, пропало ${r.missing}`, invalidate: [["clients"]],
+    success: (r) => t("Synced: {peers} peers, {imported} imported, {missing} missing", { peers: r.peers, imported: r.imported, missing: r.missing }),
+    invalidate: [["clients"]],
   });
   const bulk = useAction(({ ids, action }: { ids: string[]; action: "block" | "unblock" | "delete" }) => api.clients.bulk(ids, action), {
-    success: (r) => `Готово: ${r.done}${r.failed.length ? `, ошибок: ${r.failed.length}` : ""}`, invalidate: [["clients"], ["summary"]],
+    success: (r) => (r.failed.length ? t("Done: {done}, errors: {failed}", { done: r.done, failed: r.failed.length }) : t("Done: {done}", { done: r.done })),
+    invalidate: [["clients"], ["summary"]],
     onSuccess: () => setSelected(new Set()),
   });
 
@@ -100,26 +105,28 @@ export default function Clients() {
 
   return (
     <Page>
-      <PageHeader title="Клиенты VPN" icon={<Users size={20} />} subtitle={`${counts.all ?? 0} клиентов · ${counts.online ?? 0} онлайн`}
+      <PageHeader title={t("VPN clients")} icon={<Users size={20} />}
+        subtitle={`${tn(counts.all ?? 0, "{n} client", "{n} clients")} · ${t("{n} online", { n: counts.online ?? 0 })}`}
         actions={<>
           <button className="btn-ghost" onClick={() => exportCsv(rows)} disabled={!rows.length}><Download size={16} /> CSV</button>
           {canEdit && <>
           <button className="btn-ghost" onClick={() => sync.mutate(undefined)} disabled={sync.isPending}>
-            <RefreshCw size={16} className={clsx(sync.isPending && "animate-spin")} /> Синхронизировать
+            <RefreshCw size={16} className={clsx(sync.isPending && "animate-spin")} /> {t("Synchronize")}
           </button>
-          <button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> Новый клиент</button>
+          <button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> {t("New client")}</button>
           </>}
         </>} />
+      <SetupGuide page="clients" actions={{ create: () => setCreating(true) }} />
 
-      <div className="card space-y-3 p-3">
+      <div className="card space-y-3 p-[18px]">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input className="input pl-9" placeholder="Поиск по имени, владельцу, адресу, городу, ключу…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input pl-9" placeholder={t("Search by name, owner, address, city, key…")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {FILTERS.map((f) => (
             <button key={f.value} className={clsx("chip", filter === f.value && "chip-on")} onClick={() => setFilter(f.value)}>
-              {f.value === "online" && <StatusDot on pulse={false} />}{f.label}
+              {f.value === "online" && <StatusDot on pulse={false} />}{t(f.label)}
               <span className="rounded bg-base-950/60 px-1 text-[10px] text-slate-400">{counts[f.value] ?? 0}</span>
             </button>
           ))}
@@ -131,8 +138,8 @@ export default function Clients() {
             </button>
           ))}
           {!!tags.data?.length && <span className="mx-1 h-5 w-px bg-base-700" />}
-          {tags.data?.map((t) => (
-            <button key={t} className={clsx("chip", tag === t && "chip-on")} onClick={() => setTag(tag === t ? null : t)}>#{t}</button>
+          {tags.data?.map((tg) => (
+            <button key={tg} className={clsx("chip", tag === tg && "chip-on")} onClick={() => setTag(tag === tg ? null : tg)}>#{tg}</button>
           ))}
         </div>
       </div>
@@ -141,15 +148,16 @@ export default function Clients() {
         {selected.size > 0 && canEdit && (
           <motion.div initial={{ opacity: 0, y: -8, height: 0 }} animate={{ opacity: 1, y: 0, height: "auto" }} exit={{ opacity: 0, y: -8, height: 0 }}
             className="card flex flex-wrap items-center gap-2 border-accent/40 p-3">
-            <span className="text-sm text-slate-300">Выбрано: <b className="text-white">{selected.size}</b></span>
+            <span className="text-sm text-slate-300">{t("Selected:")} <b className="text-fg">{selected.size}</b></span>
             <div className="ml-auto flex gap-2">
-              <button className="btn-ghost btn-sm" onClick={() => bulk.mutate({ ids: [...selected], action: "block" })}><Lock size={14} /> Заблокировать</button>
-              <button className="btn-ghost btn-sm" onClick={() => bulk.mutate({ ids: [...selected], action: "unblock" })}><Unlock size={14} /> Разблокировать</button>
+              <button className="btn-ghost btn-sm" onClick={() => bulk.mutate({ ids: [...selected], action: "block" })}><Lock size={14} /> {t("Block access")}</button>
+              <button className="btn-ghost btn-sm" onClick={() => bulk.mutate({ ids: [...selected], action: "unblock" })}><Unlock size={14} /> {t("Unblock access")}</button>
               <button className="btn-danger btn-sm" onClick={async () => {
-                if (await confirm({ title: "Удалить клиентов?", message: `Будет удалено ${selected.size} клиентов вместе с ключами.`, danger: true, confirmLabel: "Удалить" }))
+                if (await confirm({ title: t("Delete the clients?"), danger: true, confirmLabel: t("Delete"),
+                  message: tn(selected.size, "{n} client will be deleted together with its keys.", "{n} clients will be deleted together with their keys.") }))
                   bulk.mutate({ ids: [...selected], action: "delete" });
-              }}><Trash2 size={14} /> Удалить</button>
-              <button className="btn-ghost btn-sm" onClick={() => setSelected(new Set())}>Сбросить</button>
+              }}><Trash2 size={14} /> {t("Delete")}</button>
+              <button className="btn-ghost btn-sm" onClick={() => setSelected(new Set())}>{t("Reset")}</button>
             </div>
           </motion.div>
         )}
@@ -158,20 +166,20 @@ export default function Clients() {
       {list.error && <ErrorState error={list.error} />}
       <div className="card overflow-hidden">
         <div className="max-h-[calc(100vh-320px)] overflow-auto">
-          <table className="table-ac min-w-[1100px]">
+          <table className="table-nc min-w-[1100px]">
             <thead>
               <tr>
-                {canEdit && <th className="w-8"><Checkbox checked={allSelected} indeterminate={!allSelected && selected.size > 0} title="Выбрать все"
+                {canEdit && <th className="w-8"><Checkbox checked={allSelected} indeterminate={!allSelected && selected.size > 0} title={t("Select all")}
                   onChange={() => setSelected(allSelected ? new Set() : new Set(rows.filter((r) => !r.system).map((r) => r.id)))} /></th>}
-                {th("name", "Клиент")}
-                <th>Адрес</th>
-                <th>Статус</th>
-                {th("rate", "Скорость ↓/↑")}
-                {th("month", "Месяц / квота")}
-                {th("total", "Всего")}
-                <th>Локация</th>
-                {th("handshake", "Handshake")}
-                <th>Доступ</th>
+                {th("name", t("Client"))}
+                <th>{t("Address")}</th>
+                <th>{t("Status")}</th>
+                {th("rate", t("Speed ↓/↑"))}
+                {th("month", t("Month / quota"))}
+                {th("total", t("Total"))}
+                <th>{t("Geolocation")}</th>
+                {th("handshake", t("Handshake"))}
+                <th>{t("Access")}</th>
                 <th className="w-px" />
               </tr>
             </thead>
@@ -185,19 +193,19 @@ export default function Clients() {
                       <StatusDot on={c.online} />
                       <span className="max-w-[260px] truncate font-medium text-slate-100" title={c.name}>{c.name}</span>
                       {c.server === "mikrotik" && <Badge tone="blue" className="!px-1">MikroTik</Badge>}
-                      {c.system && <Badge tone="violet">шлюз</Badge>}
-                      {!c.managed && <Badge tone="amber" className="!px-1">без ключа</Badge>}
+                      {c.system && <Badge tone="violet">{t("gateway")}</Badge>}
+                      {!c.managed && <Badge tone="amber" className="!px-1">{t("no key")}</Badge>}
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-1 pl-[18px] text-xs text-slate-500">
                       {c.owner && <span>{c.owner}</span>}
-                      {c.tags.map((t) => <span key={t} className="text-blue-300/70">#{t}</span>)}
+                      {c.tags.map((tg) => <span key={tg} className="text-blue-300/70">#{tg}</span>)}
                     </div>
                   </td>
                   <td className="mono text-slate-400">{c.address.replace("/32", "")}</td>
                   <td>
-                    {c.status === "active" ? <Badge tone="green">активен</Badge>
-                      : c.status === "blocked" ? <Badge tone="red"><Ban size={10} /> {REASON_LABEL[c.block_reason ?? "manual"]}</Badge>
-                      : <Badge tone="amber">нет на сервере</Badge>}
+                    {c.status === "active" ? <Badge tone="green">{t("active")}</Badge>
+                      : c.status === "blocked" ? <Badge tone="red"><Ban size={10} /> {t(REASON_LABEL[c.block_reason ?? "manual"])}</Badge>
+                      : <Badge tone="amber">{t("not on the server")}</Badge>}
                   </td>
                   <td className="mono whitespace-nowrap text-slate-300">{c.online || c.rate_rx ? <>{Fmt.rate(c.rate_rx)} <span className="text-slate-600">/</span> {Fmt.rate(c.rate_tx)}</> : <span className="text-slate-600">—</span>}</td>
                   <td className="w-44">
@@ -213,13 +221,13 @@ export default function Clients() {
                   <td onClick={(e) => e.stopPropagation()}>
                     {canEdit && (
                       <div className="flex justify-end gap-1">
-                        <button className="rounded-md p-1.5 text-slate-400 hover:bg-base-700 hover:text-white disabled:opacity-30" title="Конфиг" disabled={!c.managed} onClick={() => setConfigFor(c.id)}><QrCode size={15} /></button>
+                        <button className="rounded-md p-1.5 text-slate-400 hover:bg-base-700 hover:text-fg disabled:opacity-30" title={t("Config")} disabled={!c.managed} onClick={() => setConfigFor(c.id)}><QrCode size={15} /></button>
                         {!c.system && c.status !== "missing" && (
-                          <button className="rounded-md p-1.5 text-slate-400 hover:bg-base-700 hover:text-white" title={c.status === "blocked" ? "Разблокировать" : "Заблокировать"} onClick={() => actions.toggleBlock(c)}>
+                          <button className="rounded-md p-1.5 text-slate-400 hover:bg-base-700 hover:text-fg" title={c.status === "blocked" ? t("Unblock access") : t("Block access")} onClick={() => actions.toggleBlock(c)}>
                             {c.status === "blocked" ? <CheckCircle2 size={15} /> : <ShieldOff size={15} />}
                           </button>
                         )}
-                        {!c.system && <button className="rounded-md p-1.5 text-slate-400 hover:bg-red-500/10 hover:text-red-300" title="Удалить" onClick={() => actions.remove(c)}><Trash2 size={15} /></button>}
+                        {!c.system && <button className="rounded-md p-1.5 text-slate-400 hover:bg-red-500/10 hover:text-red-300" title={t("Delete")} onClick={() => actions.remove(c)}><Trash2 size={15} /></button>}
                       </div>
                     )}
                   </td>
@@ -227,12 +235,12 @@ export default function Clients() {
               ))}
             </tbody>
           </table>
-          {list.data && !rows.length && <EmptyState title="Клиенты не найдены" hint="Измените фильтры или создайте нового клиента" />}
+          {list.data && !rows.length && <EmptyState title={t("No clients found")} hint={t("Change the filters or create a new client")} />}
         </div>
       </div>
 
-      <Modal open={creating} onClose={() => setCreating(false)} title="Новый клиент VPN" wide>
-        <ClientForm key={settings.dataUpdatedAt} servers={servers.data} submitLabel="Создать и выдать конфиг" busy={create.isPending} onSubmit={(d) => create.mutate(d)} initial={{
+      <Modal open={creating} onClose={() => setCreating(false)} title={t("New VPN client")} wide>
+        <ClientForm key={settings.dataUpdatedAt} servers={servers.data} submitLabel={t("Create and issue the config")} busy={create.isPending} onSubmit={(d) => create.mutate(d)} initial={{
           quota_bytes: settings.data?.default_quota_gb ? Number(settings.data.default_quota_gb) * 1024 ** 3 : null,
           expires_at: settings.data?.default_valid_days ? new Date(Date.now() + Number(settings.data.default_valid_days) * 86400000).toISOString() : null,
         }} />

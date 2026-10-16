@@ -18,8 +18,8 @@ class HealthMonitor:
         if await self._secrets.healthy():
             await self._alerts.resolve("openbao.down")
         else:
-            await self._alerts.raise_("openbao.down", Severity.CRITICAL, "OpenBao недоступен или запечатан",
-                                      "Выдача конфигов и создание клиентов невозможны")
+            await self._alerts.raise_("openbao.down", Severity.CRITICAL, "OpenBao is unreachable or sealed",
+                                      "Configs cannot be issued and clients cannot be created")
         stale = await self._settings.get("gateway_stale_minutes")
         async with self._db.session() as s:
             gateways = [c for c in await ClientRepo(s).all() if c.system]
@@ -27,7 +27,7 @@ class HealthMonitor:
             age = (utcnow() - g.last_handshake_at).total_seconds() / 60 if g.last_handshake_at else None
             key = f"gateway.stale.{g.id}"
             if age is None or age > stale:
-                await self._alerts.raise_(key, Severity.CRITICAL, f"Домашний шлюз не на связи: {g.name}",
-                                          "Нет handshake с сервером" + (f" {int(age)} мин" if age else ""), str(g.id))
+                await self._alerts.raise_(key, Severity.CRITICAL, f"Home gateway is offline: {g.name}",
+                                          (f"No handshake with the server for {int(age)} min" if age else "No handshake with the server"), str(g.id))
             else:
                 await self._alerts.resolve(key)

@@ -11,7 +11,7 @@ import asyncpg
 from .services.common import EventBus
 
 log = logging.getLogger(__name__)
-CHANNEL = "amnezia_control_events"
+CHANNEL = "network_control_events"
 LEADER_KEY = 7_331_001
 CONFIG_LOCK_KEY = 7_331_002
 NOTIFY_LIMIT = 7900

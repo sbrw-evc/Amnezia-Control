@@ -4,14 +4,14 @@
 
 | Контейнер | Образ | Роль |
 |---|---|---|
-| `ac-awg-client` | `amneziavpn/amneziawg-go` | Клиент AmneziaWG шлюза. `network_mode: host`. Весь трафик, пришедший с LAN-интерфейса, уходит в `awg0` (таблица 200), NAT и MSS clamp. Версия протокола совпадает с сервером Amnezia. |
-| `ac-postgres` | `postgres:16-alpine` | Клиенты, бакеты трафика (5 мин), подключения, аудит, алерты, операторы, сессии, API-токены, сохранённые фильтры, настройки. |
-| `ac-openbao` | `openbao/openbao:2.6` | Хранилище секретов (KV v2 `amnezia/`), raft-storage, static auto-unseal. |
-| `ac-bao-init` | `openbao/openbao:2.6` | Одноразовый идемпотентный bootstrap: init, KV, политика, AppRole `backend`, импорт SSH-ключа. |
-| `ac-clickhouse` | `clickhouse/clickhouse-server:24.8` | Таблица `flows`, таблица `site_prefixes` и словарь `sites` (`ip_trie`). Лимиты памяти для слабых хостов. |
-| `ac-flow-collector` | goflow2 + Python | Приём NetFlow/IPFIX, обогащение (страна, ASN, направление, маршрут, локальное устройство), пакетная запись в ClickHouse. |
-| `ac-backend` | Python 3.12, FastAPI | REST API, SSE, фоновые задачи. Несколько процессов uvicorn. |
-| `ac-frontend` | nginx + React SPA | Статика SPA, прокси `/api`, кэширующий прокси тайлов OpenStreetMap `/tiles`. |
+| `nc-awg-client` | `amneziavpn/amneziawg-go` | Клиент AmneziaWG шлюза. `network_mode: host`. Весь трафик, пришедший с LAN-интерфейса, уходит в `awg0` (таблица 200), NAT и MSS clamp. Версия протокола совпадает с сервером Amnezia. |
+| `nc-postgres` | `postgres:16-alpine` | Клиенты, бакеты трафика (5 мин), подключения, аудит, алерты, операторы, сессии, API-токены, сохранённые фильтры, настройки. |
+| `nc-openbao` | `openbao/openbao:2.6` | Хранилище секретов (KV v2 `amnezia/`), raft-storage, static auto-unseal. |
+| `nc-bao-init` | `openbao/openbao:2.6` | Одноразовый идемпотентный bootstrap: init, KV, политика, AppRole `backend`, импорт SSH-ключа. |
+| `nc-clickhouse` | `clickhouse/clickhouse-server:24.8` | Таблица `flows`, таблица `site_prefixes` и словарь `sites` (`ip_trie`). Лимиты памяти для слабых хостов. |
+| `nc-flow-collector` | goflow2 + Python | Принимает NetFlow v5/v9, IPFIX (UDP 2055) и sFlow (UDP 6343), обогащает записи (страна, ASN, направление, маршрут, экспортёр, интерфейсы, TCP-флаги) и пишет их в ClickHouse пачками. |
+| `nc-backend` | Python 3.12, FastAPI | REST API, SSE, фоновые задачи. Несколько процессов uvicorn. |
+| `nc-frontend` | nginx + React SPA | Статика SPA, прокси `/api`, кэширующий прокси тайлов OpenStreetMap `/tiles`. |
 
 Сети: `internal` (без выхода наружу: PostgreSQL, OpenBao, ClickHouse) и `egress` (backend, frontend, коллектор).
 
@@ -37,7 +37,7 @@ API запускается в нескольких процессах (`WEB_CONC
 - **Распределённая блокировка** — все изменения `awg0.conf` сериализуются между процессами.
 - **LiveState** — кэш live-метрик в каждом процессе, наполняемый из шины.
 
-CPU-ёмкие операции (argon2, QR-коды, разбор списка сайтов, распаковка баз) выполняются в пуле потоков.
+CPU-ёмкие операции (QR-коды, разбор списка сайтов, распаковка баз) выполняются в пуле потоков.
 
 ### Фоновые задачи (лидер)
 
@@ -51,6 +51,12 @@ CPU-ёмкие операции (argon2, QR-коды, разбор списка 
 | backup | сутки | Резервная копия и ротация |
 | flow-schema | 5 мин | Схема ClickHouse и TTL |
 | purge | час | Удаление статистики старше `retention_days` |
+| devices | 30 с | Опрос устройств, у которых истёк `poll_seconds` (по 6), объединение клиентов сети, алерты `device.down` |
+| flow-enrichment | 2 мин | Имена экспортёров, интерфейсов и хостов LAN, локальные подсети → словари ClickHouse |
+| flow-rules | 60 с | Правила обнаружения по трафику → алерты |
+| threats | `threat_refresh_hours` | Загрузка публичных списков угроз в словарь `threats` |
+| rdns | 10 мин | Обратный DNS для самых активных удалённых адресов |
+| oui | неделя | Реестр IEEE OUI для производителей по MAC |
 
 ## Фронтенд
 
@@ -62,15 +68,25 @@ API-слой — классы `HttpClient` и ресурсные API (`ClientsAp
 ## Модель данных PostgreSQL
 
 `panel_users`, `panel_sessions`, `api_tokens`, `vpn_clients`, `traffic_buckets`, `connection_events`, `audit_log`,
-`alerts`, `share_links`, `saved_filters`, `settings`. Схема создаётся при старте.
+`alerts`, `share_links`, `saved_filters`, `saved_views`, `settings`, `network_devices` (реестр, сведения, интерфейсы,
+соседи, устройства контроллеров в JSONB), `endpoint_sightings` (где видели каждый MAC), `network_endpoints`
+(объединённые клиенты сети), `flow_rules`. Схема создаётся при старте. Учётные данные устройств хранятся в OpenBao
+`devices/<id>`.
 
 ## ClickHouse
 
 ```sql
-flows(TimeReceived DateTime, Direction Enum8('out','in'), Route Enum8('direct','vpn'),
-      LocalAddr IPv4, RemoteAddr IPv4, Proto UInt8, LocalPort UInt16, RemotePort UInt16,
-      RemoteAS UInt32, RemoteASName String, RemoteCountry String, Bytes UInt64, Packets UInt64, Flows UInt32)
+flows(TimeReceived DateTime, Direction Enum8('out','in','internal'), Route Enum8('direct','vpn'),
+      LocalAddr IPv6, RemoteAddr IPv6, Proto UInt8, LocalPort UInt16, RemotePort UInt16,
+      RemoteAS UInt32, RemoteASName String, RemoteCountry String, Bytes UInt64, Packets UInt64, Flows UInt32,
+      ExporterAddress IPv6, InIf UInt32, OutIf UInt32, TCPFlags UInt8, SamplingRate UInt32, ServicePort UInt16)
 ENGINE = MergeTree PARTITION BY toYYYYMMDD(TimeReceived) TTL TimeReceived + INTERVAL 30 DAY
 
-site_prefixes(prefix, site, grp)  →  DICTIONARY sites LAYOUT(IP_TRIE())
+flows_5m, flows_1h  ← MATERIALIZED VIEW (SummingMergeTree, 90 days / 2 years)
+
+site_prefixes(prefix, site, grp)      →  DICTIONARY sites     LAYOUT(IP_TRIE())
+threat_prefixes(prefix, list)         →  DICTIONARY threats   LAYOUT(IP_TRIE())
+exporters_data, hosts_data, ptr_data  →  DICTIONARY exporters, hosts, ptr  LAYOUT(HASHED())
+if_names_data(addr, idx, name, speed) →  DICTIONARY if_names  LAYOUT(COMPLEX_KEY_HASHED())
+local_networks(prefix)                   read by the collector
 ```

@@ -1,4 +1,4 @@
-**[[Amnezia Control|Home]]**
+**[[Network Control|Home]]**
 
 **Getting started**
 - [[Architecture]]
@@ -10,6 +10,8 @@
 - [[VPN clients|Clients]]
 - [[VPN on MikroTik|MikroTik-VPN]]
 - [[Monitoring and alerts|Monitoring]]
+- [[Network devices|Devices]]
+- [[Network map|Network-Map]]
 - [[Flow analytics|Flows]]
 - [[Routing]]
 
@@ -31,6 +33,8 @@
 - [[Клиенты VPN|ru-Clients]]
 - [[VPN на MikroTik|ru-MikroTik-VPN]]
 - [[Мониторинг и алерты|ru-Monitoring]]
+- [[Сетевые устройства|ru-Devices]]
+- [[Карта сети|ru-Network-Map]]
 - [[Анализ потоков|ru-Flows]]
 - [[Маршрутизация|ru-Routing]]
 - [[Безопасность|ru-Security]]

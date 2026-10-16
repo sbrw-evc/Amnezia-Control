@@ -11,7 +11,7 @@
 ### LXC on Proxmox
 
 ```bash
-pct create 210 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname amnezia-control \
+pct create 210 local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst --hostname network-control \
   --cores 2 --memory 3072 --swap 1024 --rootfs local-lvm:16 \
   --net0 name=eth0,bridge=vmbr0,gw=192.168.0.1,ip=192.168.0.210/24,type=veth \
   --unprivileged 1 --features nesting=1 --onboot 1 --dev0 /dev/net/tun
@@ -47,29 +47,28 @@ On MikroTik:
 ## Installing the panel
 
 ```bash
-mkdir -p /opt/amnezia-control && cd /opt/amnezia-control
-curl -L https://github.com/sbrw-evc/Amnezia-Control/releases/download/v1.0.0/amnezia-control-1.0.0-deploy.tar.gz   | tar xz --strip-components=1
+mkdir -p /opt/network-control && cd /opt/network-control
+curl -L https://github.com/sbrw-evc/Network-Control/releases/download/v1.0.0/network-control-1.0.0-deploy.tar.gz   | tar xz --strip-components=1
 ./install.sh
 ```
 
-Or clone the repository: `git clone https://github.com/sbrw-evc/Amnezia-Control.git /opt/amnezia-control`.
+Or clone the repository: `git clone https://github.com/sbrw-evc/Network-Control.git /opt/network-control`.
 
-`install.sh` pulls prebuilt images from GitHub Container Registry; the version is set by `AC_VERSION` in `.env`:
+`install.sh` pulls prebuilt images from GitHub Container Registry; the version is set by `NC_VERSION` in `.env`:
 
 | Image | Platforms |
 |---|---|
-| `ghcr.io/sbrw-evc/amnezia-control-backend` | linux/amd64, linux/arm64 |
-| `ghcr.io/sbrw-evc/amnezia-control-frontend` | linux/amd64, linux/arm64 |
-| `ghcr.io/sbrw-evc/amnezia-control-flow-collector` | linux/amd64, linux/arm64 |
-| `ghcr.io/sbrw-evc/amnezia-control-awg-client` | linux/amd64 |
+| `ghcr.io/sbrw-evc/network-control-backend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/network-control-frontend` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/network-control-flow-collector` | linux/amd64, linux/arm64 |
+| `ghcr.io/sbrw-evc/network-control-awg-client` | linux/amd64 |
 
 The first run creates `.env` with random passwords. Fill in the addresses (see [[Configuration]]) and run `./install.sh` again:
 it creates the data directories and the OpenBao unseal key, sets permissions and starts the stack.
 
 After the start:
 
-1. Open `PUBLIC_BASE_URL`, sign in as `admin` with the `INITIAL_ADMIN_PASSWORD` and set your own password.
-   From then on only the new password works.
+1. Connect the panel to SPA (see [[Configuration]] → Connecting to SPA), open `PUBLIC_BASE_URL` and sign in with SPA.
 2. **VPN clients → New client** — create a client for the gateway (e.g. `home-gateway`), download the `.conf`
    and save it as `awg-client/config/awg0.conf`. Run `docker compose restart awg-client`.
 3. Import the MikroTik configuration — see [[MikroTik]].
@@ -81,8 +80,8 @@ After the start:
 Set the new version in `.env` and pull the images:
 
 ```bash
-cd /opt/amnezia-control
-sed -i 's/^AC_VERSION=.*/AC_VERSION=1.0.0/' .env
+cd /opt/network-control
+sed -i 's/^NC_VERSION=.*/NC_VERSION=1.0.0/' .env
 docker compose pull && docker compose up -d
 ```
 

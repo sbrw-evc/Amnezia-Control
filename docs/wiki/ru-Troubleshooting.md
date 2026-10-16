@@ -1,7 +1,7 @@
 # Диагностика
 
 ```bash
-cd /opt/amnezia-control
+cd /opt/network-control
 docker compose ps
 docker compose logs -f backend
 docker compose logs -f awg-client
@@ -11,7 +11,7 @@ docker compose logs -f flow-collector
 ## Туннель шлюза
 
 ```bash
-docker exec ac-awg-client awg show awg0
+docker exec nc-awg-client awg show awg0
 ping -c3 -I awg0 10.8.1.0
 curl --interface awg0 https://ifconfig.me
 ip rule; ip route show table 200
@@ -41,15 +41,16 @@ ip rule; ip route show table 200
 
 ## Вход в панель
 
-- «Неверный логин или пароль» — проверьте раскладку (кнопка с глазом показывает введённый пароль); после 5 ошибок учётная запись блокируется на 10 минут.
-- `INITIAL_ADMIN_PASSWORD` из `.env` действует только до первого входа: панель сразу требует задать собственный пароль, после этого работает только он.
-- Забыт пароль — `docker compose exec backend python -m app.cli reset-password admin`.
+- «Это приложение не подключено к SPA» — задайте `SPA_CONNECTION_KEY` (см. [[Конфигурация|ru-Configuration]]); повреждённый ключ показывается на той же странице.
+- «У вас нет роли в Network Control» — администратор SPA должен выдать вам `admin`, `operator` или `viewer`.
+- Пароли, ключи доступа и MFA управляются в SPA (меню пользователя → Учётная запись и безопасность).
+- «SPA отклонил ключ подключения» в настройках — ключ перевыпущен в SPA: укажите новый в `.env`.
 - Старый интерфейс после обновления — `Ctrl+F5` (HTML не кэшируется, ресурсы версионированы).
 
 ## OpenBao
 
 ```bash
-docker exec ac-openbao bao status -address=http://127.0.0.1:8200
+docker exec nc-openbao bao status -address=http://127.0.0.1:8200
 docker compose logs bao-init
 ```
 
@@ -59,24 +60,3 @@ docker compose logs bao-init
 
 Тайлы идут через `/tiles/…` панели. Проверьте `curl -I http://<panel>/tiles/3/4/2.png` — ожидается 200 и заголовок
 `X-Tile-Cache`. Серверу нужен доступ к `tile.openstreetmap.org`.
-
-## Медленная загрузка с GitHub через VPN
-
-Симптом: `git clone` и скачивание архивов с GitHub идут на 1–3 Мбит/с, остальные сайты через VPN работают нормально.
-
-Причина: потери в несколько процентов на пути от VPS к дому. Отправители с алгоритмом перегрузки, реагирующим
-на потери (CUBIC — у GitHub), на этом обваливаются; отправители с BBR почти не страдают. Проверка: `iperf3 -u -R`
-через туннель показывает потери VPS → дом, `mtr` с VPS — потери на последних хопах.
-
-Решение: завершать TCP на VPS и отправлять домой с BBR.
-
-1. На VPS: `sh vps/github-proxy/install.sh` (задайте `PAC_PROXIES=<шлюз>:3128,10.8.1.0:3128`). Скрипт включает BBR
-   и запускает `gh-proxy` (HTTPS CONNECT, только порт 443) на адресе туннеля `10.8.1.0:3128`.
-2. На шлюзе: `PORT_FORWARDS=3128=10.8.1.0:3128` в `.env`, затем `docker compose up -d awg-client` —
-   прокси доступен в LAN как `<шлюз>:3128`.
-3. Git: `git config --global http.https://github.com/.proxy http://<шлюз>:3128`.
-4. Браузер: системный прокси «Использовать сценарий настройки» — `http://<шлюз>:3128/proxy.pac` (только домены
-   GitHub, при недоступности — напрямую).
-5. Большие файлы: `aria2c -x16 -s16 --all-proxy=http://<шлюз>:3128 <url>`.
-
-Результат в реальной сети: 1,4 → 150–190 Мбит/с в один поток.

@@ -7,16 +7,19 @@ import { useLive } from "@/lib/live";
 import { Badge, Card, Page, PageHeader, type Tone } from "@/components/ui/Primitives";
 import { Skeleton } from "@/components/ui/Feedback";
 import { Select } from "@/components/ui/Controls";
+import { k, t } from "@/i18n";
 
 const ACTIONS: Record<string, [string, Tone]> = {
-  "auth.login": ["Вход", "green"], "auth.login_failed": ["Неудачный вход", "red"], "auth.password_changed": ["Смена пароля", "blue"],
-  "auth.2fa_enabled": ["2FA включена", "green"], "auth.2fa_disabled": ["2FA отключена", "amber"],
-  "client.created": ["Клиент создан", "green"], "client.updated": ["Клиент изменён", "blue"], "client.deleted": ["Клиент удалён", "red"],
-  "client.blocked": ["Блокировка", "amber"], "client.unblocked": ["Разблокировка", "green"], "client.reissued": ["Перевыпуск ключей", "violet"],
-  "client.config_viewed": ["Выдача конфига", "slate"], "client.share_link_created": ["Ссылка создана", "violet"], "client.share_link_used": ["Ссылка открыта", "violet"],
-  "client.sync": ["Синхронизация", "slate"], "server.config_saved": ["Конфиг сервера", "red"], "routing.site_list_applied": ["Список сайтов", "blue"],
-  "settings.updated": ["Настройки", "blue"], "panel_user.created": ["Оператор добавлен", "green"], "panel_user.updated": ["Оператор изменён", "blue"],
-  "panel_user.deleted": ["Оператор удалён", "red"], "panel_user.password_reset": ["Сброс пароля", "amber"],
+  "auth.login": [k("Sign-in"), "green"], "auth.login_failed": [k("Failed sign-in"), "red"], "auth.password_changed": [k("Password changed"), "blue"],
+  "auth.2fa_enabled": [k("2FA enabled"), "green"], "auth.2fa_disabled": [k("2FA disabled"), "amber"],
+  "client.created": [k("Client created"), "green"], "client.updated": [k("Client updated"), "blue"], "client.deleted": [k("Client deleted"), "red"],
+  "client.blocked": [k("Block"), "amber"], "client.unblocked": [k("Unblock"), "green"], "client.reissued": [k("Keys reissued"), "violet"],
+  "client.config_viewed": [k("Config issued"), "slate"], "client.share_link_created": [k("Link created"), "violet"], "client.share_link_used": [k("Link opened"), "violet"],
+  "client.sync": [k("Sync"), "slate"], "server.config_saved": [k("Server config"), "red"], "routing.site_list_applied": [k("Site list"), "blue"],
+  "settings.updated": [k("Settings"), "blue"], "panel_user.created": [k("Operator added"), "green"], "panel_user.updated": [k("Operator updated"), "blue"],
+  "panel_user.deleted": [k("Operator deleted"), "red"], "panel_user.password_reset": [k("Password reset"), "amber"],
+  "auth.logout": [k("Sign-out"), "slate"], "panel_user.bound": [k("Bound to SPA"), "violet"],
+  "panel_user.disabled": [k("Disabled by SPA"), "red"], "spa.sync": [k("SPA synchronization"), "slate"],
 };
 const PAGE = 50;
 
@@ -29,23 +32,23 @@ export default function Audit() {
 
   return (
     <Page>
-      <PageHeader title="Журнал аудита" icon={<FileClock size={20} />} subtitle="Кто, что и когда менял в системе" />
+      <PageHeader title={t("Audit log")} icon={<FileClock size={20} />} subtitle={t("Who changed what and when")} />
       <div className="card flex flex-wrap gap-2 p-3">
         <div className="relative min-w-[240px] flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input className="input pl-9" placeholder="Поиск по объекту или действию" value={q} onChange={(e) => { setQ(e.target.value); setOffset(0); }} />
+          <input className="input pl-9" placeholder={t("Search by object or action")} value={q} onChange={(e) => { setQ(e.target.value); setOffset(0); }} />
         </div>
         <div className="w-[220px]">
           <Select value={action} onChange={(v) => { setAction(v); setOffset(0); }} options={[
-            { value: "", label: "Все действия" }, { value: "client.", label: "Клиенты" }, { value: "auth.", label: "Аутентификация" },
-            { value: "panel_user.", label: "Операторы" }, { value: "api_token.", label: "API-токены" }, { value: "server.", label: "Сервер" },
-            { value: "routing.", label: "Маршрутизация" }, { value: "flows.", label: "Потоки" }, { value: "backup.", label: "Резервные копии" },
-            { value: "settings.", label: "Настройки" }, { value: "notifications.", label: "Уведомления" }]} />
+            { value: "", label: t("All actions") }, { value: "client.", label: t("Clients") }, { value: "auth.", label: t("Authentication") },
+            { value: "panel_user.", label: t("Operators") }, { value: "api_token.", label: t("API tokens") }, { value: "server.", label: t("Server") },
+            { value: "routing.", label: t("Routing") }, { value: "flows.", label: t("Flows") }, { value: "backup.", label: t("Backups") },
+            { value: "settings.", label: t("Settings") }, { value: "notifications.", label: t("Notifications") }]} />
         </div>
       </div>
       <Card bodyClass="p-0">
-        <table className="table-ac">
-          <thead><tr><th>Время</th><th>Кто</th><th>Действие</th><th>Объект</th><th>Детали</th><th>IP</th></tr></thead>
+        <table className="table-nc">
+          <thead><tr><th>{t("Time")}</th><th>{t("Who")}</th><th>{t("Action")}</th><th>{t("Object")}</th><th>{t("Details")}</th><th>IP</th></tr></thead>
           <tbody>
             {data.isLoading && <tr><td colSpan={6}><Skeleton className="h-40" /></td></tr>}
             {data.data?.items.map((e) => {
@@ -54,7 +57,7 @@ export default function Audit() {
                 <tr key={e.id}>
                   <td className="whitespace-nowrap text-xs text-slate-400">{Fmt.dateTime(e.ts)}</td>
                   <td className="text-slate-200">{e.actor}</td>
-                  <td><Badge tone={tone}>{label}</Badge></td>
+                  <td><Badge tone={tone}>{ACTIONS[e.action] ? t(label) : label}</Badge></td>
                   <td className="text-slate-300">{e.target_name || "—"}</td>
                   <td className="mono max-w-[360px] truncate text-slate-500" title={JSON.stringify(e.details)}>
                     {Object.entries(e.details).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join(" ")}
@@ -66,10 +69,10 @@ export default function Audit() {
           </tbody>
         </table>
         <div className="flex items-center justify-between border-t border-base-700/60 px-4 py-2 text-xs text-slate-400">
-          <span>Всего: {data.data?.total ?? 0}</span>
+          <span>{t("Total: {n}", { n: data.data?.total ?? 0 })}</span>
           <div className="flex gap-2">
-            <button className="btn-ghost btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>← Назад</button>
-            <button className="btn-ghost btn-sm" disabled={!data.data || offset + PAGE >= data.data.total} onClick={() => setOffset(offset + PAGE)}>Вперёд →</button>
+            <button className="btn-ghost btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>← {t("Back")}</button>
+            <button className="btn-ghost btn-sm" disabled={!data.data || offset + PAGE >= data.data.total} onClick={() => setOffset(offset + PAGE)}>{t("Next")} →</button>
           </div>
         </div>
       </Card>

@@ -1,3 +1,5 @@
+import { k, locale, t } from "@/i18n";
+
 export class Fmt {
   private static readonly units = ["B", "KB", "MB", "GB", "TB", "PB"];
 
@@ -20,31 +22,31 @@ export class Fmt {
   }
 
   static ago(iso: string | null | undefined): string {
-    if (!iso) return "никогда";
+    if (!iso) return t("never");
     const s = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (s < 0) return "только что";
-    if (s < 60) return `${Math.round(s)} с назад`;
-    if (s < 3600) return `${Math.round(s / 60)} мин назад`;
-    if (s < 86400) return `${Math.round(s / 3600)} ч назад`;
-    if (s < 86400 * 30) return `${Math.round(s / 86400)} дн назад`;
+    if (s < 0) return t("just now");
+    if (s < 60) return t("{n} s ago", { n: Math.round(s) });
+    if (s < 3600) return t("{n} min ago", { n: Math.round(s / 60) });
+    if (s < 86400) return t("{n} h ago", { n: Math.round(s / 3600) });
+    if (s < 86400 * 30) return t("{n} d ago", { n: Math.round(s / 86400) });
     return Fmt.date(iso);
   }
 
   static until(iso: string | null | undefined): string {
-    if (!iso) return "бессрочно";
+    if (!iso) return t("no limit");
     const s = (new Date(iso).getTime() - Date.now()) / 1000;
-    if (s <= 0) return "истёк";
-    if (s < 3600) return `${Math.ceil(s / 60)} мин`;
-    if (s < 86400) return `${Math.ceil(s / 3600)} ч`;
-    return `${Math.ceil(s / 86400)} дн`;
+    if (s <= 0) return t("expired");
+    if (s < 3600) return t("{n} min", { n: Math.ceil(s / 60) });
+    if (s < 86400) return t("{n} h", { n: Math.ceil(s / 3600) });
+    return t("{n} d", { n: Math.ceil(s / 86400) });
   }
 
   static date(iso: string | null | undefined): string {
-    return iso ? new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+    return iso ? new Date(iso).toLocaleDateString(locale(), { day: "2-digit", month: "short", year: "numeric" }) : "—";
   }
 
   static dateTime(iso: string | null | undefined): string {
-    return iso ? new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+    return iso ? new Date(iso).toLocaleString(locale(), { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
   }
 
   static flag(code: string | null | undefined): string {
@@ -53,10 +55,11 @@ export class Fmt {
   }
 
   static num(n: number): string {
-    return n.toLocaleString("ru-RU");
+    return n.toLocaleString(locale());
   }
 }
 
-export const ROLE_LABEL: Record<string, string> = { admin: "Администратор", operator: "Оператор", viewer: "Наблюдатель" };
-export const STATUS_LABEL: Record<string, string> = { active: "Активен", blocked: "Заблокирован", missing: "Удалён на сервере" };
-export const REASON_LABEL: Record<string, string> = { manual: "вручную", expired: "срок истёк", quota: "квота" };
+/** English keys: draw them with t(). */
+export const ROLE_LABEL: Record<string, string> = { admin: k("Administrator"), operator: k("Operator"), viewer: k("Viewer") };
+export const STATUS_LABEL: Record<string, string> = { active: k("Active"), blocked: k("Blocked"), missing: k("Removed on the server") };
+export const REASON_LABEL: Record<string, string> = { manual: k("manually"), expired: k("expired"), quota: k("quota") };

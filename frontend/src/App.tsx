@@ -23,6 +23,10 @@ const Profile = lazy(() => import("@/pages/Profile"));
 const SharePage = lazy(() => import("@/pages/Share"));
 const Flows = lazy(() => import("@/pages/Flows"));
 const Backups = lazy(() => import("@/pages/Backups"));
+const Devices = lazy(() => import("@/pages/Devices"));
+const DeviceDetail = lazy(() => import("@/pages/DeviceDetail"));
+const Endpoints = lazy(() => import("@/pages/Endpoints"));
+const NetworkMap = lazy(() => import("@/pages/NetworkMap"));
 
 function Guard({ role, children }: { role: Role; children: JSX.Element }) {
   const can = useAuth((s) => s.can);
@@ -34,7 +38,6 @@ function Private() {
   const location = useLocation();
   if (!ready) return <PageLoader full />;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (user.must_change_password && location.pathname !== "/profile") return <Navigate to="/profile" replace />;
   return (
     <AppLayout>
       <Suspense fallback={<PageLoader />}>
@@ -46,6 +49,10 @@ function Private() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/flows" element={<Flows />} />
+            <Route path="/devices" element={<Devices />} />
+            <Route path="/devices/:id" element={<DeviceDetail />} />
+            <Route path="/endpoints" element={<Endpoints />} />
+            <Route path="/network-map" element={<NetworkMap />} />
             <Route path="/backups" element={<Guard role="admin"><Backups /></Guard>} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/routing" element={<Routing />} />

@@ -3,6 +3,7 @@ import { Check, ChevronDown, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
+import { t } from "@/i18n";
 
 export interface SelectOption<T extends string | number> {
   value: T;
@@ -16,7 +17,7 @@ interface Position { left: number; width: number; top?: number; bottom?: number;
 const MENU_GAP = 6;
 const MENU_MAX = 280;
 
-export function Select<T extends string | number>({ value, options, onChange, placeholder = "Выберите…", disabled, size = "md", className, menuWidth }: {
+export function Select<T extends string | number>({ value, options, onChange, placeholder = t("Choose…"), disabled, size = "md", className, menuWidth }: {
   value: T | null | undefined;
   options: SelectOption<T>[];
   onChange: (v: T) => void;
@@ -121,14 +122,14 @@ export function Select<T extends string | number>({ value, options, onChange, pl
               initial={{ opacity: 0, y: pos.top !== undefined ? -6 : 6, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: pos.top !== undefined ? -4 : 4, scale: 0.98 }} transition={{ duration: 0.14 }}
               style={{ position: "fixed", left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
-              className="z-[100] overflow-y-auto rounded-lg border border-base-600 bg-base-850 p-1 shadow-2xl shadow-black/50">
+              className="z-[100] overflow-y-auto rounded-card border border-base-700 bg-base-900 p-1 shadow-card">
               {options.map((o, i) => {
                 const isSel = o.value === value;
                 return (
                   <div key={String(o.value)} role="option" aria-selected={isSel} aria-disabled={o.disabled} data-index={i}
                     onMouseEnter={() => !o.disabled && setActive(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => choose(o)}
                     className={clsx("flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm",
-                      o.disabled ? "cursor-not-allowed opacity-40" : i === active ? "bg-accent/20 text-white" : "text-slate-200",
+                      o.disabled ? "cursor-not-allowed opacity-40" : i === active ? "bg-accent/20 text-fg" : "text-slate-200",
                       size === "sm" && "py-1.5 text-xs")}>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{o.label}</span>
@@ -138,7 +139,7 @@ export function Select<T extends string | number>({ value, options, onChange, pl
                   </div>
                 );
               })}
-              {!options.length && <div className="px-2.5 py-2 text-xs text-slate-500">Нет вариантов</div>}
+              {!options.length && <div className="px-2.5 py-2 text-xs text-slate-500">{t("No options")}</div>}
             </motion.div>
           )}
         </AnimatePresence>,
@@ -163,7 +164,7 @@ export function Checkbox({ checked, onChange, label, disabled, indeterminate, cl
       onClick={(e) => { e.stopPropagation(); onChange(!checked); }}
       className={clsx("relative grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-40",
-        on ? "border-accent bg-accent shadow-[0_0_0_3px_rgba(59,130,246,.15)]" : "border-base-600 bg-base-950/70 hover:border-slate-500")}>
+        on ? "border-accent bg-accent" : "border-base-600 bg-base-900 hover:border-slate-500")}>
       <AnimatePresence initial={false}>
         {on && (
           <motion.svg key={indeterminate ? "i" : "c"} viewBox="0 0 16 16" className="h-3 w-3 text-white"
@@ -199,7 +200,7 @@ export function Radio({ checked, onChange, label, hint, disabled }: {
         <AnimatePresence>{checked && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="h-2 w-2 rounded-full bg-accent" />}</AnimatePresence>
       </span>
       <span>
-        <span className="block text-sm text-white">{label}</span>
+        <span className="block text-sm text-fg">{label}</span>
         {hint && <span className="text-xs text-slate-500">{hint}</span>}
       </span>
     </button>
@@ -244,12 +245,12 @@ export function NumberInput({ value, onChange, min, max, step = 1, placeholder, 
   };
   const atMin = min !== undefined && text !== "" && Number(text) <= min;
   const atMax = max !== undefined && text !== "" && Number(text) >= max;
-  const btn = "grid w-8 shrink-0 place-items-center text-slate-400 transition hover:bg-base-800 hover:text-white disabled:pointer-events-none disabled:opacity-30";
+  const btn = "grid w-8 shrink-0 place-items-center text-slate-400 transition hover:bg-base-800 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
 
   return (
-    <div className={clsx("flex items-stretch overflow-hidden rounded-lg border border-base-700 bg-base-950/70 transition focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25",
+    <div className={clsx("flex h-[38px] items-stretch overflow-hidden rounded-control border border-base-600 bg-base-900 transition focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25",
       disabled && "opacity-50", className)}>
-      <button type="button" tabIndex={-1} className={btn} disabled={disabled || atMin} onClick={() => bump(-1)} aria-label="Уменьшить"><Minus size={14} /></button>
+      <button type="button" tabIndex={-1} className={btn} disabled={disabled || atMin} onClick={() => bump(-1)} aria-label={t("Decrease")}><Minus size={14} /></button>
       <input inputMode="decimal" disabled={disabled} placeholder={placeholder} value={text}
         onChange={(e) => setText(e.target.value.replace(/[^\d.,-]/g, ""))}
         onBlur={(e) => commit(e.target.value)}
@@ -260,7 +261,7 @@ export function NumberInput({ value, onChange, min, max, step = 1, placeholder, 
         }}
         className={clsx("min-w-0 flex-1 bg-transparent text-center text-slate-100 outline-none placeholder:text-slate-500 tabular-nums",
           size === "sm" ? "py-1 text-xs" : "py-2 text-sm")} />
-      <button type="button" tabIndex={-1} className={btn} disabled={disabled || atMax} onClick={() => bump(1)} aria-label="Увеличить"><Plus size={14} /></button>
+      <button type="button" tabIndex={-1} className={btn} disabled={disabled || atMax} onClick={() => bump(1)} aria-label={t("Increase")}><Plus size={14} /></button>
     </div>
   );
 }

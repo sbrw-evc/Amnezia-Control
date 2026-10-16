@@ -10,5 +10,5 @@
 /ip traffic-flow set enabled=no
 /ip firewall filter remove [find comment~"^amnezia: wireguard"]
 /ip address remove [find comment="amnezia-control"]
-/interface wireguard peers remove [find interface=wg-ac]
-/interface wireguard remove [find name=wg-ac]
+/interface wireguard peers remove [find interface=wg-nc]
+/interface wireguard remove [find name=wg-nc]

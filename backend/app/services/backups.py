@@ -19,7 +19,7 @@ from .audit import AuditService
 from .common import Actor
 from .settings import SettingsService
 
-NAME_RE = re.compile(r"^amnezia-control-\d{8}-\d{6}\.tar\.gz$")
+NAME_RE = re.compile(r"^(?:network|amnezia)-control-\d{8}-\d{6}\.tar\.gz$")
 VERSION = 1
 
 
@@ -33,10 +33,10 @@ class BackupService:
 
     def _path(self, name: str) -> str:
         if not NAME_RE.match(name):
-            raise DomainError("Недопустимое имя архива")
+            raise DomainError("Invalid archive name")
         path = os.path.join(self._dir, name)
         if not os.path.exists(path):
-            raise NotFound("Архив не найден")
+            raise NotFound("Archive not found")
         return path
 
     def list(self) -> list[dict]:
@@ -70,7 +70,7 @@ class BackupService:
         tables = await self._export_tables()
         snapshot = await self._secrets.snapshot()
         now = dt.datetime.now(dt.timezone.utc)
-        name = f"amnezia-control-{now.strftime('%Y%m%d-%H%M%S')}.tar.gz"
+        name = f"network-control-{now.strftime('%Y%m%d-%H%M%S')}.tar.gz"
         manifest = {"version": VERSION, "created_at": now.isoformat(),
                     "tables": {k: len(v) for k, v in tables.items()}, "openbao_snapshot_bytes": len(snapshot)}
         db_json = json.dumps(tables, default=str, ensure_ascii=False).encode()

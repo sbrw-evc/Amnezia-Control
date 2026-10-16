@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { AlertTriangle } from "lucide-react";
+import { t } from "@/i18n";
 import { Modal } from "./Primitives";
 
 interface ConfirmRequest {
@@ -23,11 +25,14 @@ export function ConfirmHost() {
   const close = (ok: boolean) => { req?.resolve(ok); set(null); };
   return (
     <Modal open={!!req} onClose={() => close(false)} title={req?.title ?? ""}>
-      <p className="select-text whitespace-pre-line text-sm leading-relaxed text-slate-300">{req?.message}</p>
+      <div className="flex gap-3">
+        {req?.danger && <AlertTriangle size={20} className="mt-0.5 shrink-0 text-red-300" />}
+        <p className="select-text whitespace-pre-line text-sm leading-relaxed text-slate-300">{req?.message}</p>
+      </div>
       <div className="mt-6 flex justify-end gap-2">
-        <button className="btn-ghost" onClick={() => close(false)}>Отмена</button>
+        <button className="btn-ghost" onClick={() => close(false)}>{t("Cancel")}</button>
         <button className={req?.danger ? "btn-danger" : "btn-primary"} onClick={() => close(true)} autoFocus>
-          {req?.confirmLabel ?? "Подтвердить"}
+          {req?.confirmLabel ?? t("Confirm")}
         </button>
       </div>
     </Modal>

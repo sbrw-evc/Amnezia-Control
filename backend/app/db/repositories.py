@@ -18,7 +18,7 @@ T = TypeVar("T", bound=Base)
 
 class Repository(Generic[T]):
     model: type[T]
-    label = "Объект"
+    label = "Object"
 
     def __init__(self, session: AsyncSession):
         self.s = session
@@ -29,7 +29,7 @@ class Repository(Generic[T]):
     async def require(self, key) -> T:
         obj = await self.get(key)
         if obj is None:
-            raise NotFound(f"{self.label} не найден")
+            raise NotFound(f"{self.label} not found")
         return obj
 
     async def all(self, *where, order_by=None, limit: int | None = None) -> Sequence[T]:
@@ -50,7 +50,7 @@ class Repository(Generic[T]):
 
 class UserRepo(Repository[PanelUser]):
     model = PanelUser
-    label = "Пользователь панели"
+    label = "Panel user"
 
     async def by_username(self, username: str) -> PanelUser | None:
         return (await self.s.execute(select(PanelUser).where(func.lower(PanelUser.username) == username.lower()))).scalar_one_or_none()
@@ -60,6 +60,10 @@ class UserRepo(Repository[PanelUser]):
 
     async def count_admins(self) -> int:
         return (await self.s.execute(select(func.count()).where(PanelUser.role == "admin", PanelUser.is_active))).scalar_one()
+
+    async def by_external(self, source: str, external_id: str) -> PanelUser | None:
+        q = select(PanelUser).where(PanelUser.source == source, PanelUser.external_id == external_id)
+        return (await self.s.execute(q)).scalar_one_or_none()
 
 
 class SessionRepo(Repository[PanelSession]):
@@ -81,7 +85,7 @@ class SessionRepo(Repository[PanelSession]):
 
 class ClientRepo(Repository[VpnClient]):
     model = VpnClient
-    label = "Клиент VPN"
+    label = "VPN client"
 
     async def by_public_key(self, pub: str) -> VpnClient | None:
         return (await self.s.execute(select(VpnClient).where(VpnClient.public_key == pub))).scalar_one_or_none()
@@ -225,20 +229,23 @@ class AlertRepo(Repository[Alert]):
 
 class ShareRepo(Repository[ShareLink]):
     model = ShareLink
-    label = "Ссылка"
+    label = "Link"
 
 
 class ApiTokenRepo(Repository[ApiToken]):
     model = ApiToken
-    label = "Токен"
+    label = "Token"
 
     async def by_hash(self, token_hash: str) -> ApiToken | None:
         return (await self.s.execute(select(ApiToken).where(ApiToken.token_hash == token_hash))).scalar_one_or_none()
 
+    async def revoke_user(self, user_id: int) -> int:
+        return (await self.s.execute(delete(ApiToken).where(ApiToken.user_id == user_id))).rowcount or 0
+
 
 class SavedFilterRepo(Repository[SavedFilter]):
     model = SavedFilter
-    label = "Фильтр"
+    label = "Filter"
 
     async def visible(self, username: str) -> Sequence[SavedFilter]:
         return await self.all(or_(SavedFilter.shared, SavedFilter.created_by == username), order_by=SavedFilter.name)
